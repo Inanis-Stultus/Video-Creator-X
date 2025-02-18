@@ -193,13 +193,19 @@ def process_video(timeline, output_path, target_resolution=None):
 
                 clips.append(clip)
 
-            # Ensure clips don't overlap during transitions
+            # Ensure clips don't overlap during transitions by calculating proper start times
             final_clips = []
             current_start = 0
-            for clip in clips:
+            for idx, clip in enumerate(clips):
+                # Set the start time for the current clip
                 clip = clip.set_start(current_start)
                 final_clips.append(clip)
-                current_start += clip.duration - transition_duration
+
+                # Calculate the next start time:
+                # - For transitions, we need to ensure the current clip's fade out completes
+                #   before the next clip's fade in begins
+                # Move the start time by the full duration of the current clip
+                current_start += clip.duration
 
             final_clip = mp.CompositeVideoClip(final_clips, size=(target_width, target_height))
             final_clip.write_videofile(output_path, codec='libx264', audio_codec='aac', fps=24)
