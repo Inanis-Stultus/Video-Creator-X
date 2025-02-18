@@ -105,7 +105,7 @@ def apply_filter(clip, filter_type):
         logger.error(f"Failed to apply filter {filter_type}: {str(e)}")
         return clip
 
-def apply_transition(clip, transition_type='fade', duration=1.0, position='start'):
+def apply_transition(clip, transition_type='fade-in', duration=1.0, position='start'):
     """Apply transition effect to a clip at the start or end."""
     try:
         if transition_type == 'none':
@@ -115,20 +115,41 @@ def apply_transition(clip, transition_type='fade', duration=1.0, position='start
         original_pos = clip.pos if hasattr(clip, 'pos') else lambda t: ('center', 'center')
         clip_width, clip_height = clip.size
 
-        if transition_type == 'fade':
-            if position == 'start':
+        # Map UI transition names to internal names
+        transition_map = {
+            'fade-in': ('fade', 'start'),
+            'fade-out': ('fade', 'end'),
+            'dissolve-in': ('dissolve', 'start'),
+            'dissolve-out': ('dissolve', 'end'),
+            'wipe-right': ('wipe', 'start'),
+            'wipe-left': ('wipe', 'end'),
+            'slide-right': ('slide', 'start'),
+            'slide-left': ('slide', 'end'),
+            'rotate-in': ('rotate', 'start'),
+            'rotate-out': ('rotate', 'end'),
+            'zoom-in': ('zoom', 'start'),
+            'zoom-out': ('zoom', 'end'),
+            'blur-in': ('blur', 'start'),
+            'blur-out': ('blur', 'end')
+        }
+
+        # Get internal transition type and position
+        internal_type, internal_position = transition_map.get(transition_type, (transition_type, position))
+
+        if internal_type == 'fade':
+            if internal_position == 'start':
                 return clip.fadein(duration)
             else:
                 return clip.fadeout(duration)
-        elif transition_type == 'dissolve':
-            if position == 'start':
+        elif internal_type == 'dissolve':
+            if internal_position == 'start':
                 mask = mp.VideoClip(lambda t: 1 - (t/duration if t < duration else 1), duration=clip.duration)
                 return clip.set_mask(mask)
             else:
                 mask = mp.VideoClip(lambda t: (t-clip.duration+duration)/duration if t > clip.duration-duration else 1, duration=clip.duration)
                 return clip.set_mask(mask)
-        elif transition_type == 'wipe':
-            if position == 'start':
+        elif internal_type == 'wipe':
+            if internal_position == 'start':
                 def wipe_mask(t):
                     if t < duration:
                         return np.tile(np.linspace(0, 1, clip_width) > (1 - t/duration), (clip_height, 1))
@@ -143,8 +164,8 @@ def apply_transition(clip, transition_type='fade', duration=1.0, position='start
                     return 1
                 mask = mp.VideoClip(lambda t: wipe_mask(t), duration=clip.duration)
                 return clip.set_mask(mask)
-        elif transition_type == 'slide':
-            if position == 'start':
+        elif internal_type == 'slide':
+            if internal_position == 'start':
                 def slide_pos(t):
                     if t < duration:
                         progress = t / duration
@@ -158,8 +179,8 @@ def apply_transition(clip, transition_type='fade', duration=1.0, position='start
                         return (clip_width * progress, original_pos(t)[1])
                     return original_pos(t)
                 return clip.set_position(slide_pos)
-        elif transition_type == 'rotate':
-            if position == 'start':
+        elif internal_type == 'rotate':
+            if internal_position == 'start':
                 def rotate_scale(t):
                     if t < duration:
                         angle = 360 * (1 - t/duration)
@@ -176,8 +197,8 @@ def apply_transition(clip, transition_type='fade', duration=1.0, position='start
                         return lambda pic: mp.vfx.rotate(pic, angle).resize(scale)
                     return lambda pic: pic
                 return clip.transform(rotate_scale)
-        elif transition_type == 'zoom':
-            if position == 'start':
+        elif internal_type == 'zoom':
+            if internal_position == 'start':
                 def zoom_scale(t):
                     if t < duration:
                         return 1.5 + 4 * (1 - t / duration)
@@ -191,8 +212,8 @@ def apply_transition(clip, transition_type='fade', duration=1.0, position='start
                     return 1
                 zoomed_clip = clip.resize(zoom_scale)
                 return zoomed_clip.set_position(original_pos)
-        elif transition_type == 'blur':
-            if position == 'start':
+        elif internal_type == 'blur':
+            if internal_position == 'start':
                 def blur_transform(get_frame, t):
                     frame = get_frame(t)
                     if t < duration:
@@ -267,8 +288,8 @@ def process_video(timeline, output_path, target_resolution=None):
                     clip = apply_filter(clip, item['filter'])
 
                 # Apply transitions
-                start_transition = item.get('startTransition', 'fade')
-                end_transition = item.get('endTransition', 'fade')
+                start_transition = item.get('startTransition', 'fade-in')
+                end_transition = item.get('endTransition', 'fade-out')
 
                 if start_transition != 'none':
                     clip = apply_transition(clip, start_transition, transition_duration, 'start')

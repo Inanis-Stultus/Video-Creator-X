@@ -11,6 +11,17 @@ document.addEventListener('DOMContentLoaded', function() {
         resolutionControls.style.display = this.checked ? 'flex' : 'none';
     });
 
+    // Initialize timeline manager
+    window.timelineManager = {
+        items: [],
+        updateUI: function() {
+            document.dispatchEvent(new CustomEvent('timelineUpdated', { detail: { items: this.items } }));
+        },
+        calculateTotalDuration: function() {
+            return this.items.reduce((total, item) => total + parseFloat(item.duration || 0), 0);
+        }
+    };
+
     // File upload handling
     dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
@@ -39,17 +50,13 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function validateFile(file) {
-        // Check file size
         if (file.size > MAX_FILE_SIZE) {
             throw new Error(`File ${file.name} is too large. Maximum size is 16MB`);
         }
-
-        // Check file type
         const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'video/mp4'];
         if (!allowedTypes.includes(file.type)) {
             throw new Error(`File ${file.name} has unsupported type. Allowed types: JPG, PNG, GIF, MP4`);
         }
-
         return true;
     }
 
@@ -85,9 +92,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     file_data: data.file_data,
                     duration: 5,
                     keepAudio: true,
-                    startTransition: 'fade',
-                    endTransition: 'fade',
-                    filter: 'none'  // Default filter
+                    startTransition: 'fade-in',
+                    endTransition: 'fade-out',
+                    filter: 'none'
                 });
                 window.timelineManager.updateUI();
                 showAlert(`File ${file.name} uploaded successfully`, 'success');
@@ -97,6 +104,144 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             showAlert('Upload failed: ' + error, 'danger');
         }
+    }
+
+    function updateTimelineUI(items) {
+        const timelineContainer = document.getElementById('timeline');
+        timelineContainer.innerHTML = '';
+
+        items.forEach((item, index) => {
+            const element = document.createElement('div');
+            element.className = 'timeline-item';
+            element.draggable = true;
+            element.dataset.index = index;
+            element.innerHTML = `
+                <div class="card bg-dark">
+                    <div class="card-body">
+                        <h5 class="card-title">${item.filename}</h5>
+                        <div class="form-group mb-3">
+                            <label>Duration (seconds)</label>
+                            <input type="number" class="form-control" value="${item.duration}" 
+                                onchange="window.timelineManager.updateDuration(${index}, this.value)" min="0.1" step="0.1">
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label>Start Transition</label>
+                                    <select class="form-control" onchange="window.timelineManager.updateTransition(${index}, this.value, 'start')">
+                                        <option value="none">None</option>
+                                        <option value="fade-in" ${item.startTransition === 'fade-in' ? 'selected' : ''}>Fade In</option>
+                                        <option value="dissolve-in" ${item.startTransition === 'dissolve-in' ? 'selected' : ''}>Dissolve In</option>
+                                        <option value="wipe-right" ${item.startTransition === 'wipe-right' ? 'selected' : ''}>Wipe Right</option>
+                                        <option value="slide-right" ${item.startTransition === 'slide-right' ? 'selected' : ''}>Slide Right</option>
+                                        <option value="rotate-in" ${item.startTransition === 'rotate-in' ? 'selected' : ''}>Rotate In</option>
+                                        <option value="zoom-in" ${item.startTransition === 'zoom-in' ? 'selected' : ''}>Zoom In</option>
+                                        <option value="blur-in" ${item.startTransition === 'blur-in' ? 'selected' : ''}>Blur In</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label>End Transition</label>
+                                    <select class="form-control" onchange="window.timelineManager.updateTransition(${index}, this.value, 'end')">
+                                        <option value="none">None</option>
+                                        <option value="fade-out" ${item.endTransition === 'fade-out' ? 'selected' : ''}>Fade Out</option>
+                                        <option value="dissolve-out" ${item.endTransition === 'dissolve-out' ? 'selected' : ''}>Dissolve Out</option>
+                                        <option value="wipe-left" ${item.endTransition === 'wipe-left' ? 'selected' : ''}>Wipe Left</option>
+                                        <option value="slide-left" ${item.endTransition === 'slide-left' ? 'selected' : ''}>Slide Left</option>
+                                        <option value="rotate-out" ${item.endTransition === 'rotate-out' ? 'selected' : ''}>Rotate Out</option>
+                                        <option value="zoom-out" ${item.endTransition === 'zoom-out' ? 'selected' : ''}>Zoom Out</option>
+                                        <option value="blur-out" ${item.endTransition === 'blur-out' ? 'selected' : ''}>Blur Out</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label>Filter Effect</label>
+                            <select class="form-control" onchange="window.timelineManager.updateFilter(${index}, this.value)">
+                                <option value="none" ${!item.filter || item.filter === 'none' ? 'selected' : ''}>No Filter</option>
+                                <option value="grayscale" ${item.filter === 'grayscale' ? 'selected' : ''}>Black & White</option>
+                                <option value="sepia" ${item.filter === 'sepia' ? 'selected' : ''}>Sepia Tone</option>
+                                <option value="blur" ${item.filter === 'blur' ? 'selected' : ''}>Soft Blur</option>
+                                <option value="sharpen" ${item.filter === 'sharpen' ? 'selected' : ''}>Sharpen</option>
+                                <option value="invert" ${item.filter === 'invert' ? 'selected' : ''}>Invert Colors</option>
+                                <option value="bright" ${item.filter === 'bright' ? 'selected' : ''}>Brighten</option>
+                                <option value="dark" ${item.filter === 'dark' ? 'selected' : ''}>Darken</option>
+                                <option value="contrast" ${item.filter === 'contrast' ? 'selected' : ''}>High Contrast</option>
+                                <option value="vignette" ${item.filter === 'vignette' ? 'selected' : ''}>Vignette</option>
+                            </select>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" ${item.keepAudio ? 'checked' : ''}
+                                onchange="window.timelineManager.updateAudio(${index}, this.checked)">
+                            <label class="form-check-label">Keep Audio</label>
+                        </div>
+                        <button class="btn btn-danger btn-sm" onclick="window.timelineManager.removeItem(${index})">Remove</button>
+                    </div>
+                </div>
+            `;
+            timelineContainer.appendChild(element);
+        });
+
+        updateDurationDisplay();
+    }
+
+    // Timeline management functions
+    window.timelineManager.updateDuration = function(index, value) {
+        const duration = parseFloat(value);
+        if (duration > 0) {
+            this.items[index].duration = duration;
+            this.updateUI();
+        }
+    };
+
+    window.timelineManager.updateTransition = function(index, value, type) {
+        if (type === 'start') {
+            this.items[index].startTransition = value;
+        } else {
+            this.items[index].endTransition = value;
+        }
+        this.updateUI();
+    };
+
+    window.timelineManager.updateFilter = function(index, value) {
+        this.items[index].filter = value;
+        this.updateUI();
+    };
+
+    window.timelineManager.updateAudio = function(index, checked) {
+        this.items[index].keepAudio = checked;
+        this.updateUI();
+    };
+
+    window.timelineManager.removeItem = function(index) {
+        this.items.splice(index, 1);
+        this.updateUI();
+    };
+
+    function updateDurationDisplay() {
+        const totalDuration = window.timelineManager.calculateTotalDuration();
+        const durationDisplay = document.createElement('div');
+        durationDisplay.className = 'text-muted mt-2 duration-display';
+        durationDisplay.textContent = `Total Duration: ${totalDuration.toFixed(1)}s`;
+
+        const existingDisplay = document.querySelector('.duration-display');
+        if (existingDisplay) {
+            existingDisplay.remove();
+        }
+        document.getElementById('timeline').appendChild(durationDisplay);
+    }
+
+    function showAlert(message, type) {
+        const alertContainer = document.getElementById('alert-container');
+        const alert = document.createElement('div');
+        alert.className = `alert alert-${type} alert-dismissible fade show`;
+        alert.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        alertContainer.appendChild(alert);
+        setTimeout(() => alert.remove(), 5000);
     }
 
     async function exportVideo() {
@@ -164,121 +309,5 @@ document.addEventListener('DOMContentLoaded', function() {
             exportBtn.disabled = false;
             exportBtn.innerHTML = 'Export Video';
         }
-    }
-
-    function showAlert(message, type) {
-        const alertContainer = document.getElementById('alert-container');
-        const alert = document.createElement('div');
-        alert.className = `alert alert-${type} alert-dismissible fade show`;
-        alert.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        `;
-        alertContainer.appendChild(alert);
-        setTimeout(() => alert.remove(), 5000);
-    }
-
-    function updateTimelineUI(items) {
-        const timelineContainer = document.getElementById('timeline');
-        timelineContainer.innerHTML = '';
-
-        items.forEach((item, index) => {
-            const element = document.createElement('div');
-            element.className = 'timeline-item';
-            element.draggable = true;
-            element.dataset.index = index;
-            element.innerHTML = `
-                <div class="card bg-dark">
-                    <div class="card-body">
-                        <h5 class="card-title">${item.filename}</h5>
-                        <div class="form-group mb-3">
-                            <label>Duration (seconds)</label>
-                            <input type="number" class="form-control" value="${item.duration}" 
-                                onchange="updateDuration(${index}, this.value)" min="0.1" step="0.1">
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group mb-3">
-                                    <label>Start Transition</label>
-                                    <select class="form-control" onchange="updateTransition(${index}, this.value, 'start')">
-                                        <option value="none" ${item.startTransition === 'none' ? 'selected' : ''}>None</option>
-                                        <option value="fade" ${item.startTransition === 'fade' ? 'selected' : ''}>Fade</option>
-                                        <option value="dissolve" ${item.startTransition === 'dissolve' ? 'selected' : ''}>Dissolve</option>
-                                        <option value="wipe" ${item.startTransition === 'wipe' ? 'selected' : ''}>Wipe</option>
-                                        <option value="slide" ${item.startTransition === 'slide' ? 'selected' : ''}>Slide</option>
-                                        <option value="rotate" ${item.startTransition === 'rotate' ? 'selected' : ''}>Rotate</option>
-                                        <option value="zoom" ${item.startTransition === 'zoom' ? 'selected' : ''}>Zoom</option>
-                                        <option value="blur" ${item.startTransition === 'blur' ? 'selected' : ''}>Blur</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-group mb-3">
-                                    <label>End Transition</label>
-                                    <select class="form-control" onchange="updateTransition(${index}, this.value, 'end')">
-                                        <option value="none" ${item.endTransition === 'none' ? 'selected' : ''}>None</option>
-                                        <option value="fade" ${item.endTransition === 'fade' ? 'selected' : ''}>Fade</option>
-                                        <option value="dissolve" ${item.endTransition === 'dissolve' ? 'selected' : ''}>Dissolve</option>
-                                        <option value="wipe" ${item.endTransition === 'wipe' ? 'selected' : ''}>Wipe</option>
-                                        <option value="slide" ${item.endTransition === 'slide' ? 'selected' : ''}>Slide</option>
-                                        <option value="rotate" ${item.endTransition === 'rotate' ? 'selected' : ''}>Rotate</option>
-                                        <option value="zoom" ${item.endTransition === 'zoom' ? 'selected' : ''}>Zoom</option>
-                                        <option value="blur" ${item.endTransition === 'blur' ? 'selected' : ''}>Blur</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="form-group mb-3">
-                            <label>Filter</label>
-                            <select class="form-control" onchange="updateFilter(${index}, this.value)">
-                                <option value="none" ${!item.filter || item.filter === 'none' ? 'selected' : ''}>None</option>
-                                <option value="grayscale" ${item.filter === 'grayscale' ? 'selected' : ''}>Grayscale</option>
-                                <option value="sepia" ${item.filter === 'sepia' ? 'selected' : ''}>Sepia</option>
-                                <option value="blur" ${item.filter === 'blur' ? 'selected' : ''}>Blur</option>
-                                <option value="sharpen" ${item.filter === 'sharpen' ? 'selected' : ''}>Sharpen</option>
-                                <option value="invert" ${item.filter === 'invert' ? 'selected' : ''}>Invert Colors</option>
-                                <option value="bright" ${item.filter === 'bright' ? 'selected' : ''}>Brighten</option>
-                                <option value="dark" ${item.filter === 'dark' ? 'selected' : ''}>Darken</option>
-                                <option value="contrast" ${item.filter === 'contrast' ? 'selected' : ''}>Contrast</option>
-                                <option value="vignette" ${item.filter === 'vignette' ? 'selected' : ''}>Vignette</option>
-                            </select>
-                        </div>
-                        <div class="form-check mb-3">
-                            <input type="checkbox" class="form-check-input" ${item.keepAudio ? 'checked' : ''}
-                                onchange="updateAudio(${index}, this.checked)">
-                            <label class="form-check-label">Keep Audio</label>
-                        </div>
-                        <button class="btn btn-danger btn-sm" onclick="removeItem(${index})">Remove</button>
-                    </div>
-                </div>
-            `;
-            timelineContainer.appendChild(element);
-        });
-
-        updateDurationDisplay();
-    }
-
-    function updateDurationDisplay(){
-        //This function is assumed to exist elsewhere and update the duration display.  Place a stub here if needed.
-    }
-
-    function updateDuration(index, value){
-        //This function is assumed to exist elsewhere and update the duration.  Place a stub here if needed.
-    }
-
-    function updateTransition(index, value, type){
-        //This function is assumed to exist elsewhere and update the transition.  Place a stub here if needed.
-    }
-
-    function updateFilter(index, value){
-        //This function is assumed to exist elsewhere and update the filter.  Place a stub here if needed.
-    }
-
-    function updateAudio(index, checked){
-        //This function is assumed to exist elsewhere and update the audio setting. Place a stub here if needed.
-    }
-
-    function removeItem(index){
-        //This function is assumed to exist elsewhere and remove the item. Place a stub here if needed.
     }
 });
