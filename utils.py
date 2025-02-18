@@ -2,7 +2,6 @@ import os
 import logging
 import moviepy.editor as mp
 from moviepy.video.fx import all as vfx
-from file_manager import FileManager
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +31,7 @@ def get_max_resolution(timeline):
             max_width = max(max_width, width)
             max_height = max(max_height, height)
 
-    return max_width or 1920, max_height or 1080
+    return max_width or 1920, max_height or 1080  # Default to 1080p if no valid media
 
 def resize_clip_maintain_aspect(clip, target_width, target_height):
     """Resize clip maintaining aspect ratio with padding if needed."""
@@ -41,27 +40,24 @@ def resize_clip_maintain_aspect(clip, target_width, target_height):
         orig_aspect = orig_width / orig_height
         target_aspect = target_width / target_height
 
-        # Create a black background clip
+        # Create a black background clip for the entire duration
         bg_clip = mp.ColorClip(size=(target_width, target_height), color=(0, 0, 0))
         bg_clip = bg_clip.set_duration(clip.duration)
 
-        # Calculate new dimensions maintaining aspect ratio
-        if orig_aspect > target_aspect:
+        if orig_aspect > target_aspect:  # Width is the limiting factor
             new_width = target_width
             new_height = int(target_width / orig_aspect)
-        else:
+            scaled_clip = clip.resize(width=new_width, height=new_height)
+            y_position = (target_height - new_height) // 2
+            positioned_clip = scaled_clip.set_position(("center", y_position))
+        else:  # Height is the limiting factor
             new_height = target_height
             new_width = int(target_height * orig_aspect)
+            scaled_clip = clip.resize(width=new_width, height=new_height)
+            x_position = (target_width - new_width) // 2
+            positioned_clip = scaled_clip.set_position((x_position, "center"))
 
-        # Resize with updated PIL parameters
-        resized_clip = clip.resize(width=new_width, height=new_height)
-
-        # Center the clip
-        x_pos = (target_width - new_width) // 2
-        y_pos = (target_height - new_height) // 2
-
-        positioned_clip = resized_clip.set_position((x_pos, y_pos))
-        return mp.CompositeVideoClip([bg_clip, positioned_clip])
+        return mp.CompositeVideoClip([bg_clip, positioned_clip], size=(target_width, target_height))
     except Exception as e:
         logger.error(f"Failed to resize clip: {str(e)}")
         return clip
@@ -72,6 +68,8 @@ def apply_transition(clip, transition_type='fade', duration=1.0, position='start
         if transition_type == 'none':
             return clip
 
+        # Store original position and size
+        original_pos = clip.pos if hasattr(clip, 'pos') else lambda t: ('center', 'center')
         clip_width, clip_height = clip.size
 
         if transition_type == 'fade':
@@ -84,55 +82,42 @@ def apply_transition(clip, transition_type='fade', duration=1.0, position='start
                 def slide_pos(t):
                     if t < duration:
                         progress = t / duration
-                        return (-clip_width + (clip_width * progress), 'center')
-                    return ('center', 'center')
+                        return (-clip_width + (clip_width * progress), original_pos(t)[1])
+                    return original_pos(t)
                 return clip.set_position(slide_pos)
             else:
                 def slide_pos(t):
                     if t > clip.duration - duration:
                         progress = (t - (clip.duration - duration)) / duration
-                        return (clip_width * progress, 'center')
-                    return ('center', 'center')
+                        return (clip_width * progress, original_pos(t)[1])
+                    return original_pos(t)
                 return clip.set_position(slide_pos)
         elif transition_type == 'zoom':
             if position == 'start':
                 def zoom_scale(t):
                     if t < duration:
-                        # Start from scale 0.2 and zoom in to 1.0
-                        progress = t / duration
-                        return 0.2 + (0.8 * progress)
-                    return 1.0
-
-                # Apply zoom effect
-                zoomed = clip.resize(lambda t: zoom_scale(t))
-                return zoomed.set_position('center')
+                        return 1.5 + 4 * (1 - t / duration)
+                    return 1
+                zoomed_clip = clip.resize(zoom_scale)
+                return zoomed_clip.set_position(original_pos)
             else:
                 def zoom_scale(t):
                     if t > clip.duration - duration:
-                        # Start from scale 1.0 and zoom out to 0.2
-                        progress = (t - (clip.duration - duration)) / duration
-                        return 1.0 - (0.8 * progress)
-                    return 1.0
-
-                # Apply zoom effect
-                zoomed = clip.resize(lambda t: zoom_scale(t))
-                return zoomed.set_position('center')
-
+                        return 1 + 0.9 * ((t - (clip.duration - duration)) / duration)
+                    return 1
+                zoomed_clip = clip.resize(zoom_scale)
+                return zoomed_clip.set_position(original_pos)
         return clip
     except Exception as e:
         logger.error(f"Failed to apply transition: {str(e)}")
         return clip
 
 def process_video(timeline, output_path, target_resolution=None):
-    """Process video clips according to timeline with progress tracking."""
+    """Process video clips according to timeline."""
     clips = []
-    transition_duration = 1.0
-    file_manager = FileManager.get_instance()
+    transition_duration = 1.0  # Default transition duration
 
     try:
-        total_steps = len(timeline) * 2 + 1  # Loading + processing for each clip + final export
-        current_step = 0
-
         # Determine target resolution
         if target_resolution:
             target_width, target_height = target_resolution
@@ -148,10 +133,6 @@ def process_video(timeline, output_path, target_resolution=None):
 
             duration = float(item.get('duration', 5))
             keep_audio = item.get('keepAudio', True)
-
-            # Update progress for loading
-            current_step += 1
-            file_manager.update_progress((current_step / total_steps) * 100)
 
             if filepath.lower().endswith(('.png', '.jpg', '.jpeg')):
                 clip = mp.ImageClip(filepath, duration=duration)
@@ -176,7 +157,7 @@ def process_video(timeline, output_path, target_resolution=None):
                     except Exception as e:
                         logger.error(f"Failed to apply effect {effect}: {str(e)}")
 
-            # Apply transitions
+            # Apply separate transitions for start and end
             start_transition = item.get('startTransition', 'fade')
             end_transition = item.get('endTransition', 'fade')
 
@@ -187,31 +168,27 @@ def process_video(timeline, output_path, target_resolution=None):
 
             clips.append(clip)
 
-            # Update progress for processing
-            current_step += 1
-            file_manager.update_progress((current_step / total_steps) * 100)
-
         # Ensure clips don't overlap during transitions
         final_clips = []
         current_start = 0
         for clip in clips:
+            # Adjust start time to account for previous clip's end transition
             clip = clip.set_start(current_start)
             final_clips.append(clip)
-            current_start += clip.duration - (transition_duration / 2)
+            # Next clip should start after this clip's content and end transition
+            current_start += clip.duration
 
-        # Create final composition
         final_clip = mp.CompositeVideoClip(final_clips, size=(target_width, target_height))
         final_clip.write_videofile(output_path, codec='libx264', audio_codec='aac', fps=24)
 
-        # Cleanup clips
+        # Cleanup clips to free memory
         for clip in clips:
             clip.close()
         final_clip.close()
-
-        # Set progress to 100% when complete
-        file_manager.update_progress(100)
 
         return True
     except Exception as e:
         logger.error(f"Video processing failed: {str(e)}")
         raise
+
+from file_manager import FileManager
