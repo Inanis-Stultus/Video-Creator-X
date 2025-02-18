@@ -1,6 +1,7 @@
 import os
 import io
 import logging
+import base64
 import moviepy.editor as mp
 from moviepy.video.fx import all as vfx
 
@@ -55,6 +56,26 @@ def resize_clip_maintain_aspect(clip, target_width, target_height):
         return mp.CompositeVideoClip([bg_clip, positioned_clip], size=(target_width, target_height))
     except Exception as e:
         logger.error(f"Failed to resize clip: {str(e)}")
+        return clip
+
+def apply_filter(clip, filter_type):
+    """Apply video filter to clip."""
+    try:
+        if filter_type == 'grayscale':
+            return clip.fx(vfx.blackwhite)
+        elif filter_type == 'blur':
+            return clip.fx(vfx.blur, sigma=2)
+        elif filter_type == 'mirror':
+            return clip.fx(vfx.mirror_x)
+        elif filter_type == 'bright':
+            return clip.fx(vfx.colorx, factor=1.5)
+        elif filter_type == 'dark':
+            return clip.fx(vfx.colorx, factor=0.5)
+        elif filter_type == 'contrast':
+            return clip.fx(vfx.lum_contrast, contrast=50)
+        return clip
+    except Exception as e:
+        logger.error(f"Failed to apply filter {filter_type}: {str(e)}")
         return clip
 
 def apply_transition(clip, transition_type='fade', duration=1.0, position='start'):
@@ -120,11 +141,12 @@ def process_video(timeline, output_stream, target_resolution=None):
             if not file_data:
                 raise ValueError("No file data provided")
 
+            # Decode base64 data
+            binary_data = base64.b64decode(file_data)
+            file_buffer = io.BytesIO(binary_data)
+
             duration = float(item.get('duration', 5))
             keep_audio = item.get('keepAudio', True)
-
-            # Create a BytesIO object from the file data
-            file_buffer = io.BytesIO(file_data)
 
             if item['filename'].lower().endswith(('.png', '.jpg', '.jpeg')):
                 clip = mp.ImageClip(file_buffer, duration=duration)
@@ -149,18 +171,11 @@ def process_video(timeline, output_stream, target_resolution=None):
             # Resize clip to target resolution with proper centering
             clip = resize_clip_maintain_aspect(clip, target_width, target_height)
 
-            # Apply effects before transitions
-            if item.get('effects'):
-                for effect in item['effects']:
-                    try:
-                        if effect == 'grayscale':
-                            clip = clip.fx(vfx.blackwhite)
-                        elif effect == 'mirror':
-                            clip = clip.fx(vfx.mirror_x)
-                    except Exception as e:
-                        logger.error(f"Failed to apply effect {effect}: {str(e)}")
+            # Apply filters
+            if item.get('filter'):
+                clip = apply_filter(clip, item['filter'])
 
-            # Apply separate transitions for start and end
+            # Apply transitions
             start_transition = item.get('startTransition', 'fade')
             end_transition = item.get('endTransition', 'fade')
 
@@ -175,10 +190,8 @@ def process_video(timeline, output_stream, target_resolution=None):
         final_clips = []
         current_start = 0
         for clip in clips:
-            # Adjust start time to account for previous clip's end transition
             clip = clip.set_start(current_start)
             final_clips.append(clip)
-            # Next clip should start after this clip's content and end transition
             current_start += clip.duration
 
         final_clip = mp.CompositeVideoClip(final_clips, size=(target_width, target_height))

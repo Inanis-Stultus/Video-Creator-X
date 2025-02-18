@@ -35,7 +35,7 @@ class Timeline {
 
             const draggingItem = timelineContainer.querySelector('.dragging');
             const siblings = [...timelineContainer.querySelectorAll('.timeline-item:not(.dragging)')];
-            
+
             const nextSibling = siblings.find(sibling => {
                 return e.clientY < sibling.getBoundingClientRect().top + sibling.offsetHeight / 2;
             });
@@ -65,7 +65,7 @@ class Timeline {
         const preview = document.getElementById('preview');
 
         try {
-            if (item.filepath.match(/\.(jpg|jpeg|png)$/i)) {
+            if (item.filename.match(/\.(jpg|jpeg|png)$/i)) {
                 // Handle image preview
                 preview.style.display = 'none';
                 const img = document.createElement('img');
@@ -138,6 +138,19 @@ class Timeline {
                                 </div>
                             </div>
                         </div>
+                        <div class="form-group mb-3">
+                            <label>Filter</label>
+                            <select class="form-control" 
+                                onchange="window.timelineManager.updateFilter(${index}, this.value)">
+                                <option value="none" ${item.filter === 'none' ? 'selected' : ''}>None</option>
+                                <option value="grayscale" ${item.filter === 'grayscale' ? 'selected' : ''}>Grayscale</option>
+                                <option value="blur" ${item.filter === 'blur' ? 'selected' : ''}>Blur</option>
+                                <option value="bright" ${item.filter === 'bright' ? 'selected' : ''}>Bright</option>
+                                <option value="dark" ${item.filter === 'dark' ? 'selected' : ''}>Dark</option>
+                                <option value="contrast" ${item.filter === 'contrast' ? 'selected' : ''}>High Contrast</option>
+                                <option value="mirror" ${item.filter === 'mirror' ? 'selected' : ''}>Mirror</option>
+                            </select>
+                        </div>
                         <div class="form-check mb-3">
                             <input type="checkbox" class="form-check-input" ${item.keepAudio ? 'checked' : ''}
                                 onchange="window.timelineManager.updateAudio(${index}, this.checked)">
@@ -164,6 +177,11 @@ class Timeline {
 
     updateAudio(index, value) {
         this.items[index].keepAudio = value;
+        this.updateUI();
+    }
+
+    updateFilter(index, value) {
+        this.items[index].filter = value;
         this.updateUI();
     }
 

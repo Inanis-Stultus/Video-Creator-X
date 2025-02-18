@@ -1,6 +1,7 @@
 import os
 import io
 import logging
+import base64
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, send_file, Response
 from werkzeug.utils import secure_filename
@@ -45,13 +46,14 @@ def upload_file():
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
                 unique_filename = timestamp + filename
 
-                # Read file data into memory
-                file_data = file.read()
+                # Read file data and encode as base64
+                file_data = base64.b64encode(file.read()).decode('utf-8')
 
                 return jsonify({
                     'success': True,
                     'filename': unique_filename,
-                    'file_data': file_data.decode('utf-8') #added to handle potential decoding issues.
+                    'file_data': file_data,
+                    'mime_type': file.content_type
                 })
             except Exception as e:
                 logger.error(f"File processing error: {str(e)}")

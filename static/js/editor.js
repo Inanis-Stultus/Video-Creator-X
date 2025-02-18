@@ -86,7 +86,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     duration: 5,
                     keepAudio: true,
                     startTransition: 'fade',
-                    endTransition: 'fade'
+                    endTransition: 'fade',
+                    filter: 'none'  // Default filter
                 });
                 window.timelineManager.updateUI();
                 showAlert(`File ${file.name} uploaded successfully`, 'success');
