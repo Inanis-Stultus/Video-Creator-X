@@ -143,9 +143,6 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
 
         internal_type, internal_position = transition_map.get(transition_type, (transition_type, position))
 
-        # Create a copy of the clip to preserve audio
-        clip_with_transition = clip.copy()
-
         if internal_type == 'fade':
             if internal_position == 'start':
                 return clip.fx(vfx.fadein, duration)
@@ -153,84 +150,100 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
                 return clip.fx(vfx.fadeout, duration)
 
         elif internal_type == 'dissolve':
+            # Create a dissolve effect using a custom mask
             def make_frame(t):
                 frame = clip.get_frame(t)
-                h, w = frame.shape[:2]
-
                 if internal_position == 'start':
                     if t < duration:
-                        # Create a checkerboard pattern for dissolve
-                        pattern_size = 20
-                        x = np.arange(w).reshape(1, w)
-                        y = np.arange(h).reshape(h, 1)
-                        pattern = ((x + y) // pattern_size) % 2
-
-                        progress = t / duration
-                        threshold = np.random.random(pattern.shape) * (1 - progress)
-                        mask = pattern > threshold
+                        # Create a random dissolve pattern
+                        random_mask = np.random.random(frame.shape[:2])
+                        threshold = t / duration
+                        mask = random_mask < threshold
                         mask = np.dstack([mask] * 3)
                         return frame * mask
                     return frame
                 else:
                     remaining = clip.duration - t
                     if remaining < duration:
-                        pattern_size = 20
-                        x = np.arange(w).reshape(1, w)
-                        y = np.arange(h).reshape(h, 1)
-                        pattern = ((x + y) // pattern_size) % 2
-
-                        progress = remaining / duration
-                        threshold = np.random.random(pattern.shape) * progress
-                        mask = pattern > threshold
+                        random_mask = np.random.random(frame.shape[:2])
+                        threshold = remaining / duration
+                        mask = random_mask < threshold
                         mask = np.dstack([mask] * 3)
                         return frame * mask
                     return frame
 
             new_clip = mp.VideoClip(make_frame, duration=clip.duration)
             new_clip.fps = clip.fps
-            if clip.audio is not None:
-                new_clip = new_clip.set_audio(clip.audio)
             return new_clip
 
         elif internal_type == 'slide':
+            # Handle slide transitions with proper position management
             def get_slide_position(t):
                 if internal_position == 'start':
                     if t < duration:
                         progress = t / duration
-                        return (clip_width * (progress - 1), 'center')
+                        # Start from right (-width) and slide to center (0)
+                        x_offset = clip_width * (progress - 1)
+                        return (x_offset, 'center')
                     return ('center', 'center')
                 else:
                     remaining = clip.duration - t
                     if remaining < duration:
                         progress = 1 - (remaining / duration)
-                        return (clip_width * progress, 'center')
+                        # Start from center (0) and slide to left (+width)
+                        x_offset = clip_width * progress
+                        return (x_offset, 'center')
                     return ('center', 'center')
 
+            # Create a new clip with the sliding position
             sliding_clip = clip.set_position(get_slide_position)
-            if clip.audio is not None:
-                sliding_clip = sliding_clip.set_audio(clip.audio)
             return sliding_clip
 
         elif internal_type == 'zoom':
+            # Handle zoom transitions with proper scale management
             def get_zoom_scale(t):
                 if internal_position == 'start':
                     if t < duration:
-                        # Start from 0.5 and zoom to 1.0
+                        # Start small (0.1) and zoom to normal (1.0)
                         progress = t / duration
-                        return 0.5 + 0.5 * progress
+                        return 0.1 + 0.9 * progress
                     return 1.0
                 else:
                     remaining = clip.duration - t
                     if remaining < duration:
-                        # Start from 1.0 and zoom to 0.5
-                        progress = remaining / duration
-                        return 0.5 + 0.5 * progress
+                        # Start normal (1.0) and zoom to large (2.0)
+                        progress = 1 - (remaining / duration)
+                        return 1.0 + progress
                     return 1.0
 
-            zoomed_clip = clip.fx(vfx.resize, lambda t: get_zoom_scale(t))
-            if clip.audio is not None:
-                zoomed_clip = zoomed_clip.set_audio(clip.audio)
-            return zoomed_clip
+            return clip.fx(vfx.resize, lambda t: get_zoom_scale(t))
+
+        elif internal_type == 'wipe':
+            def make_frame(t):
+                frame = clip.get_frame(t)
+                h, w = frame.shape[:2]
+                mask = np.zeros((h, w))
+
+                if internal_position == 'start':
+                    if t < duration:
+                        edge = int(w * (t/duration))
+                        mask[:, :edge] = 1
+                    else:
+                        mask[:, :] = 1
+                else:
+                    remaining = clip.duration - t
+                    if remaining < duration:
+                        edge = int(w * (remaining/duration))
+                        mask[:, :edge] = 1
+                    else:
+                        mask[:, :] = 1
+
+                mask = np.dstack([mask] * 3)
+                return frame * mask
+
+            new_clip = mp.VideoClip(make_frame, duration=clip.duration)
+            new_clip.fps = clip.fps
+            return new_clip
 
         elif internal_type == 'rotate':
             def make_frame(t):
@@ -262,37 +275,6 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
 
             new_clip = mp.VideoClip(make_frame, duration=clip.duration)
             new_clip.fps = clip.fps
-            if clip.audio is not None:
-                new_clip = new_clip.set_audio(clip.audio)
-            return new_clip
-
-        elif internal_type == 'wipe':
-            def make_frame(t):
-                frame = clip.get_frame(t)
-                h, w = frame.shape[:2]
-                mask = np.zeros((h, w))
-
-                if internal_position == 'start':
-                    if t < duration:
-                        edge = int(w * (t/duration))
-                        mask[:, :edge] = 1
-                    else:
-                        mask[:, :] = 1
-                else:
-                    remaining = clip.duration - t
-                    if remaining < duration:
-                        edge = int(w * (remaining/duration))
-                        mask[:, :edge] = 1
-                    else:
-                        mask[:, :] = 1
-
-                mask = np.dstack([mask] * 3)
-                return frame * mask
-
-            new_clip = mp.VideoClip(make_frame, duration=clip.duration)
-            new_clip.fps = clip.fps
-            if clip.audio is not None:
-                new_clip = new_clip.set_audio(clip.audio)
             return new_clip
 
         elif internal_type == 'blur':
@@ -312,8 +294,6 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
 
             new_clip = mp.VideoClip(make_frame, duration=clip.duration)
             new_clip.fps = clip.fps
-            if clip.audio is not None:
-                new_clip = new_clip.set_audio(clip.audio)
             return new_clip
 
         return clip
