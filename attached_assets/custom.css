@@ -1,0 +1,57 @@
+.timeline-container {
+    min-height: 200px;
+    border: 2px dashed var(--bs-secondary);
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+.drop-zone {
+    border: 2px dashed var(--bs-secondary);
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.drop-zone.drag-over {
+    border-color: var(--bs-primary);
+    background-color: rgba(var(--bs-primary-rgb), 0.1);
+}
+
+.timeline-item {
+    margin-bottom: 1rem;
+}
+
+.timeline-item .card {
+    background-color: var(--bs-dark);
+    border: 1px solid var(--bs-secondary);
+}
+
+.preview-container {
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+    background-color: var(--bs-dark);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+#alert-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+}
+
+.form-control {
+    background-color: var(--bs-dark);
+    border-color: var(--bs-secondary);
+    color: var(--bs-light);
+}
+
+.form-control:focus {
+    background-color: var(--bs-dark);
+    border-color: var(--bs-primary);
+    color: var(--bs-light);
+}
