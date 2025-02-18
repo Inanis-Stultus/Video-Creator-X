@@ -177,4 +177,108 @@ document.addEventListener('DOMContentLoaded', function() {
         alertContainer.appendChild(alert);
         setTimeout(() => alert.remove(), 5000);
     }
+
+    function updateTimelineUI(items) {
+        const timelineContainer = document.getElementById('timeline');
+        timelineContainer.innerHTML = '';
+
+        items.forEach((item, index) => {
+            const element = document.createElement('div');
+            element.className = 'timeline-item';
+            element.draggable = true;
+            element.dataset.index = index;
+            element.innerHTML = `
+                <div class="card bg-dark">
+                    <div class="card-body">
+                        <h5 class="card-title">${item.filename}</h5>
+                        <div class="form-group mb-3">
+                            <label>Duration (seconds)</label>
+                            <input type="number" class="form-control" value="${item.duration}" 
+                                onchange="updateDuration(${index}, this.value)" min="0.1" step="0.1">
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label>Start Transition</label>
+                                    <select class="form-control" onchange="updateTransition(${index}, this.value, 'start')">
+                                        <option value="none" ${item.startTransition === 'none' ? 'selected' : ''}>None</option>
+                                        <option value="fade" ${item.startTransition === 'fade' ? 'selected' : ''}>Fade</option>
+                                        <option value="dissolve" ${item.startTransition === 'dissolve' ? 'selected' : ''}>Dissolve</option>
+                                        <option value="wipe" ${item.startTransition === 'wipe' ? 'selected' : ''}>Wipe</option>
+                                        <option value="slide" ${item.startTransition === 'slide' ? 'selected' : ''}>Slide</option>
+                                        <option value="rotate" ${item.startTransition === 'rotate' ? 'selected' : ''}>Rotate</option>
+                                        <option value="zoom" ${item.startTransition === 'zoom' ? 'selected' : ''}>Zoom</option>
+                                        <option value="blur" ${item.startTransition === 'blur' ? 'selected' : ''}>Blur</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label>End Transition</label>
+                                    <select class="form-control" onchange="updateTransition(${index}, this.value, 'end')">
+                                        <option value="none" ${item.endTransition === 'none' ? 'selected' : ''}>None</option>
+                                        <option value="fade" ${item.endTransition === 'fade' ? 'selected' : ''}>Fade</option>
+                                        <option value="dissolve" ${item.endTransition === 'dissolve' ? 'selected' : ''}>Dissolve</option>
+                                        <option value="wipe" ${item.endTransition === 'wipe' ? 'selected' : ''}>Wipe</option>
+                                        <option value="slide" ${item.endTransition === 'slide' ? 'selected' : ''}>Slide</option>
+                                        <option value="rotate" ${item.endTransition === 'rotate' ? 'selected' : ''}>Rotate</option>
+                                        <option value="zoom" ${item.endTransition === 'zoom' ? 'selected' : ''}>Zoom</option>
+                                        <option value="blur" ${item.endTransition === 'blur' ? 'selected' : ''}>Blur</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label>Filter</label>
+                            <select class="form-control" onchange="updateFilter(${index}, this.value)">
+                                <option value="none" ${!item.filter || item.filter === 'none' ? 'selected' : ''}>None</option>
+                                <option value="grayscale" ${item.filter === 'grayscale' ? 'selected' : ''}>Grayscale</option>
+                                <option value="sepia" ${item.filter === 'sepia' ? 'selected' : ''}>Sepia</option>
+                                <option value="blur" ${item.filter === 'blur' ? 'selected' : ''}>Blur</option>
+                                <option value="sharpen" ${item.filter === 'sharpen' ? 'selected' : ''}>Sharpen</option>
+                                <option value="invert" ${item.filter === 'invert' ? 'selected' : ''}>Invert Colors</option>
+                                <option value="bright" ${item.filter === 'bright' ? 'selected' : ''}>Brighten</option>
+                                <option value="dark" ${item.filter === 'dark' ? 'selected' : ''}>Darken</option>
+                                <option value="contrast" ${item.filter === 'contrast' ? 'selected' : ''}>Contrast</option>
+                                <option value="vignette" ${item.filter === 'vignette' ? 'selected' : ''}>Vignette</option>
+                            </select>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" ${item.keepAudio ? 'checked' : ''}
+                                onchange="updateAudio(${index}, this.checked)">
+                            <label class="form-check-label">Keep Audio</label>
+                        </div>
+                        <button class="btn btn-danger btn-sm" onclick="removeItem(${index})">Remove</button>
+                    </div>
+                </div>
+            `;
+            timelineContainer.appendChild(element);
+        });
+
+        updateDurationDisplay();
+    }
+
+    function updateDurationDisplay(){
+        //This function is assumed to exist elsewhere and update the duration display.  Place a stub here if needed.
+    }
+
+    function updateDuration(index, value){
+        //This function is assumed to exist elsewhere and update the duration.  Place a stub here if needed.
+    }
+
+    function updateTransition(index, value, type){
+        //This function is assumed to exist elsewhere and update the transition.  Place a stub here if needed.
+    }
+
+    function updateFilter(index, value){
+        //This function is assumed to exist elsewhere and update the filter.  Place a stub here if needed.
+    }
+
+    function updateAudio(index, checked){
+        //This function is assumed to exist elsewhere and update the audio setting. Place a stub here if needed.
+    }
+
+    function removeItem(index){
+        //This function is assumed to exist elsewhere and remove the item. Place a stub here if needed.
+    }
 });

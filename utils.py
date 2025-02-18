@@ -3,6 +3,7 @@ import io
 import logging
 import base64
 import tempfile
+import numpy as np
 import moviepy.editor as mp
 from moviepy.video.fx import all as vfx
 
@@ -64,16 +65,41 @@ def apply_filter(clip, filter_type):
     try:
         if filter_type == 'grayscale':
             return clip.fx(vfx.blackwhite)
+        elif filter_type == 'sepia':
+            def make_sepia(image):
+                sepia_matrix = np.array([
+                    [0.393, 0.769, 0.189],
+                    [0.349, 0.686, 0.168],
+                    [0.272, 0.534, 0.131]
+                ])
+                sepia_img = image.dot(sepia_matrix.T)
+                np.clip(sepia_img, 0, 255, out=sepia_img)
+                return sepia_img
+            return clip.image_transform(make_sepia)
         elif filter_type == 'blur':
             return clip.fx(vfx.blur, sigma=2)
-        elif filter_type == 'mirror':
-            return clip.fx(vfx.mirror_x)
+        elif filter_type == 'sharpen':
+            return clip.fx(vfx.lum_contrast, contrast=50, brightness=0)
+        elif filter_type == 'invert':
+            return clip.image_transform(lambda frame: 255 - frame)
         elif filter_type == 'bright':
             return clip.fx(vfx.colorx, factor=1.5)
         elif filter_type == 'dark':
             return clip.fx(vfx.colorx, factor=0.5)
         elif filter_type == 'contrast':
             return clip.fx(vfx.lum_contrast, contrast=50)
+        elif filter_type == 'vignette':
+            def add_vignette(get_frame, t):
+                frame = get_frame(t)
+                height, width = frame.shape[:2]
+                x = np.linspace(-1, 1, width)
+                y = np.linspace(-1, 1, height)
+                X, Y = np.meshgrid(x, y)
+                mask = np.sqrt(X**2 + Y**2)
+                mask = np.clip(1 - mask, 0, 1)
+                mask = np.dstack((mask, mask, mask))
+                return frame * mask
+            return clip.transform(add_vignette)
         return clip
     except Exception as e:
         logger.error(f"Failed to apply filter {filter_type}: {str(e)}")
@@ -94,6 +120,29 @@ def apply_transition(clip, transition_type='fade', duration=1.0, position='start
                 return clip.fadein(duration)
             else:
                 return clip.fadeout(duration)
+        elif transition_type == 'dissolve':
+            if position == 'start':
+                mask = mp.VideoClip(lambda t: 1 - (t/duration if t < duration else 1), duration=clip.duration)
+                return clip.set_mask(mask)
+            else:
+                mask = mp.VideoClip(lambda t: (t-clip.duration+duration)/duration if t > clip.duration-duration else 1, duration=clip.duration)
+                return clip.set_mask(mask)
+        elif transition_type == 'wipe':
+            if position == 'start':
+                def wipe_mask(t):
+                    if t < duration:
+                        return np.tile(np.linspace(0, 1, clip_width) > (1 - t/duration), (clip_height, 1))
+                    return 1
+                mask = mp.VideoClip(lambda t: wipe_mask(t), duration=clip.duration)
+                return clip.set_mask(mask)
+            else:
+                def wipe_mask(t):
+                    if t > clip.duration - duration:
+                        progress = (t - (clip.duration - duration))/duration
+                        return np.tile(np.linspace(0, 1, clip_width) > progress, (clip_height, 1))
+                    return 1
+                mask = mp.VideoClip(lambda t: wipe_mask(t), duration=clip.duration)
+                return clip.set_mask(mask)
         elif transition_type == 'slide':
             if position == 'start':
                 def slide_pos(t):
@@ -109,6 +158,24 @@ def apply_transition(clip, transition_type='fade', duration=1.0, position='start
                         return (clip_width * progress, original_pos(t)[1])
                     return original_pos(t)
                 return clip.set_position(slide_pos)
+        elif transition_type == 'rotate':
+            if position == 'start':
+                def rotate_scale(t):
+                    if t < duration:
+                        angle = 360 * (1 - t/duration)
+                        scale = t/duration
+                        return lambda pic: mp.vfx.rotate(pic, angle).resize(scale)
+                    return lambda pic: pic
+                return clip.transform(rotate_scale)
+            else:
+                def rotate_scale(t):
+                    if t > clip.duration - duration:
+                        progress = (t - (clip.duration - duration))/duration
+                        angle = 360 * progress
+                        scale = 1 - progress
+                        return lambda pic: mp.vfx.rotate(pic, angle).resize(scale)
+                    return lambda pic: pic
+                return clip.transform(rotate_scale)
         elif transition_type == 'zoom':
             if position == 'start':
                 def zoom_scale(t):
@@ -124,6 +191,23 @@ def apply_transition(clip, transition_type='fade', duration=1.0, position='start
                     return 1
                 zoomed_clip = clip.resize(zoom_scale)
                 return zoomed_clip.set_position(original_pos)
+        elif transition_type == 'blur':
+            if position == 'start':
+                def blur_transform(get_frame, t):
+                    frame = get_frame(t)
+                    if t < duration:
+                        sigma = 20 * (1 - t/duration)
+                        return vfx.blur(frame, sigma)
+                    return frame
+                return clip.transform(blur_transform)
+            else:
+                def blur_transform(get_frame, t):
+                    frame = get_frame(t)
+                    if t > clip.duration - duration:
+                        sigma = 20 * ((t - (clip.duration - duration))/duration)
+                        return vfx.blur(frame, sigma)
+                    return frame
+                return clip.transform(blur_transform)
         return clip
     except Exception as e:
         logger.error(f"Failed to apply transition: {str(e)}")
