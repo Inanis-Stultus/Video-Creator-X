@@ -69,21 +69,23 @@ def apply_filter(clip, filter_type):
             return clip.fx(vfx.blackwhite)
         elif filter_type == 'sepia':
             def make_sepia(frame):
-                # Ensure frame is uint8
-                frame = np.array(frame, dtype=np.uint8)
+                frame_array = np.array(frame)
                 sepia_matrix = np.array([
                     [0.393, 0.769, 0.189],
                     [0.349, 0.686, 0.168],
                     [0.272, 0.534, 0.131]
                 ])
-                sepia_img = frame.dot(sepia_matrix.T)
-                np.clip(sepia_img, 0, 255, out=sepia_img)
-                return sepia_img.astype(np.uint8)
+                sepia_image = np.dot(frame_array[...,:3], sepia_matrix.T)
+                sepia_image = np.clip(sepia_image, 0, 255).astype(np.uint8)
+                return sepia_image
             return clip.fl_image(make_sepia)
         elif filter_type == 'blur':
-            return clip.fx(vfx.blur, sigma=2)
+            return clip.fx(vfx.blur, radius=3.0)
         elif filter_type == 'sharpen':
-            return clip.fx(vfx.lum_contrast, contrast=50, brightness=0)
+            def sharpen(frame):
+                kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+                return cv2.filter2D(frame, -1, kernel)
+            return clip.fl_image(sharpen)
         elif filter_type == 'invert':
             def invert(frame):
                 return 255 - frame
@@ -96,15 +98,15 @@ def apply_filter(clip, filter_type):
             return clip.fx(vfx.lum_contrast, contrast=50)
         elif filter_type == 'vignette':
             def add_vignette(frame):
-                height, width = frame.shape[:2]
-                y, x = np.ogrid[:height, :width]
-                center_y, center_x = height/2, width/2
-                dist = np.sqrt((x - center_x)**2 + (y - center_y)**2)
-                max_dist = np.sqrt(center_x**2 + center_y**2)
-                mask = 1 - (dist/max_dist)
-                mask = np.clip(mask, 0, 1)
-                mask = np.dstack([mask]*3)
-                return (frame * mask).astype(np.uint8)
+                rows, cols = frame.shape[:2]
+                # Generate vignette mask
+                kernel_x = cv2.getGaussianKernel(cols, cols/2)
+                kernel_y = cv2.getGaussianKernel(rows, rows/2)
+                kernel = kernel_y * kernel_x.T
+                mask = 255 * kernel / np.linalg.norm(kernel)
+                mask = np.repeat(mask[:, :, np.newaxis], 3, axis=2)
+                vignetted = frame * (mask/255)
+                return vignetted.astype(np.uint8)
             return clip.fl_image(add_vignette)
         return clip
     except Exception as e:
@@ -139,123 +141,135 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
             'blur-out': ('blur', 'end')
         }
 
-        # Get internal transition type and position
         internal_type, internal_position = transition_map.get(transition_type, (transition_type, position))
 
         if internal_type == 'fade':
             if internal_position == 'start':
-                return clip.fadein(duration)
+                return clip.fx(vfx.fadein, duration)
             else:
-                return clip.fadeout(duration)
+                return clip.fx(vfx.fadeout, duration)
+
         elif internal_type == 'dissolve':
-            if internal_position == 'start':
-                def make_mask(t):
-                    return np.minimum(1, t/duration) if t < duration else 1
-                mask = mp.VideoClip(lambda t: make_mask(t), duration=clip.duration)
-                return clip.set_mask(mask)
-            else:
-                def make_mask(t):
+            def make_frame(t):
+                frame = clip.get_frame(t)
+                if internal_position == 'start':
+                    alpha = min(1, t/duration) if t < duration else 1
+                else:
                     remaining = clip.duration - t
-                    return np.minimum(1, remaining/duration) if remaining < duration else 1
-                mask = mp.VideoClip(lambda t: make_mask(t), duration=clip.duration)
-                return clip.set_mask(mask)
+                    alpha = min(1, remaining/duration) if remaining < duration else 1
+                return frame * alpha
+
+            new_clip = mp.VideoClip(make_frame, duration=clip.duration)
+            new_clip.fps = clip.fps
+            return new_clip
+
         elif internal_type == 'wipe':
-            if internal_position == 'start':
-                def make_mask(t):
+            def make_frame(t):
+                frame = clip.get_frame(t)
+                h, w = frame.shape[:2]
+                mask = np.zeros((h, w))
+                if internal_position == 'start':
                     if t < duration:
-                        progress = t/duration
-                        mask = np.zeros((clip_height, clip_width))
-                        edge = int(clip_width * progress)
+                        edge = int(w * (t/duration))
                         mask[:, :edge] = 1
-                        return mask
-                    return np.ones((clip_height, clip_width))
-                mask = mp.VideoClip(lambda t: make_mask(t), duration=clip.duration)
-                return clip.set_mask(mask)
-            else:
-                def make_mask(t):
+                    else:
+                        mask[:, :] = 1
+                else:
                     remaining = clip.duration - t
                     if remaining < duration:
-                        progress = remaining/duration
-                        mask = np.zeros((clip_height, clip_width))
-                        edge = int(clip_width * progress)
+                        edge = int(w * (remaining/duration))
                         mask[:, :edge] = 1
-                        return mask
-                    return np.ones((clip_height, clip_width))
-                mask = mp.VideoClip(lambda t: make_mask(t), duration=clip.duration)
-                return clip.set_mask(mask)
+                    else:
+                        mask[:, :] = 1
+
+                mask = np.dstack([mask] * 3)
+                return frame * mask
+
+            new_clip = mp.VideoClip(make_frame, duration=clip.duration)
+            new_clip.fps = clip.fps
+            return new_clip
+
         elif internal_type == 'slide':
             if internal_position == 'start':
                 def slide_pos(t):
                     if t < duration:
-                        progress = t/duration
-                        return (clip_width * (progress - 1), original_pos(t)[1])
-                    return original_pos(t)
+                        return (clip_width * (t/duration - 1), 'center')
+                    return ('center', 'center')
                 return clip.set_position(slide_pos)
             else:
                 def slide_pos(t):
                     remaining = clip.duration - t
                     if remaining < duration:
-                        progress = 1 - (remaining/duration)
-                        return (clip_width * progress, original_pos(t)[1])
-                    return original_pos(t)
+                        return (clip_width * (1 - remaining/duration), 'center')
+                    return ('center', 'center')
                 return clip.set_position(slide_pos)
+
         elif internal_type == 'rotate':
-            if internal_position == 'start':
-                def make_frame(t):
+            def make_frame(t):
+                frame = clip.get_frame(t)
+                h, w = frame.shape[:2]
+                center = (w//2, h//2)
+
+                if internal_position == 'start':
                     if t < duration:
                         angle = 360 * (1 - t/duration)
                         scale = t/duration
-                        frame = clip.get_frame(t)
-                        center = (frame.shape[1]//2, frame.shape[0]//2)
-                        matrix = cv2.getRotationMatrix2D(center, angle, scale)
-                        return cv2.warpAffine(frame, matrix, (frame.shape[1], frame.shape[0]))
-                    return clip.get_frame(t)
-                return mp.VideoClip(make_frame, duration=clip.duration)
-            else:
-                def make_frame(t):
+                    else:
+                        angle = 0
+                        scale = 1
+                else:
                     remaining = clip.duration - t
                     if remaining < duration:
-                        progress = remaining/duration
-                        angle = 360 * (1 - progress)
-                        scale = progress
-                        frame = clip.get_frame(t)
-                        center = (frame.shape[1]//2, frame.shape[0]//2)
-                        matrix = cv2.getRotationMatrix2D(center, angle, scale)
-                        return cv2.warpAffine(frame, matrix, (frame.shape[1], frame.shape[0]))
-                    return clip.get_frame(t)
-                return mp.VideoClip(make_frame, duration=clip.duration)
+                        angle = 360 * (1 - remaining/duration)
+                        scale = remaining/duration
+                    else:
+                        angle = 0
+                        scale = 1
+
+                if scale > 0:
+                    matrix = cv2.getRotationMatrix2D(center, angle, scale)
+                    rotated = cv2.warpAffine(frame, matrix, (w, h))
+                    return rotated
+                return np.zeros_like(frame)
+
+            new_clip = mp.VideoClip(make_frame, duration=clip.duration)
+            new_clip.fps = clip.fps
+            return new_clip
+
         elif internal_type == 'zoom':
             if internal_position == 'start':
-                def zoom_scale(t):
+                def scale_func(t):
                     if t < duration:
-                        return 0.5 + 0.5 * (t/duration)
-                    return 1
-                return clip.resize(zoom_scale)
+                        return 0.1 + 0.9 * (t/duration)
+                    return 1.0
+                return clip.fx(vfx.resize, lambda t: scale_func(t))
             else:
-                def zoom_scale(t):
+                def scale_func(t):
                     remaining = clip.duration - t
                     if remaining < duration:
-                        return 1 + (remaining/duration)
-                    return 1
-                return clip.resize(zoom_scale)
+                        return 0.1 + 0.9 * (remaining/duration)
+                    return 1.0
+                return clip.fx(vfx.resize, lambda t: scale_func(t))
+
         elif internal_type == 'blur':
-            if internal_position == 'start':
-                def blur_frame(t):
+            def make_frame(t):
+                frame = clip.get_frame(t)
+                if internal_position == 'start':
                     if t < duration:
                         sigma = 20 * (1 - t/duration)
-                        frame = clip.get_frame(t)
-                        return vfx.blur(frame, sigma=sigma)
-                    return clip.get_frame(t)
-                return mp.VideoClip(blur_frame, duration=clip.duration)
-            else:
-                def blur_frame(t):
+                        return cv2.GaussianBlur(frame, (0,0), sigma)
+                    return frame
+                else:
                     remaining = clip.duration - t
                     if remaining < duration:
                         sigma = 20 * (1 - remaining/duration)
-                        frame = clip.get_frame(t)
-                        return vfx.blur(frame, sigma=sigma)
-                    return clip.get_frame(t)
-                return mp.VideoClip(blur_frame, duration=clip.duration)
+                        return cv2.GaussianBlur(frame, (0,0), sigma)
+                    return frame
+
+            new_clip = mp.VideoClip(make_frame, duration=clip.duration)
+            new_clip.fps = clip.fps
+            return new_clip
+
         return clip
     except Exception as e:
         logger.error(f"Failed to apply transition: {str(e)}")
