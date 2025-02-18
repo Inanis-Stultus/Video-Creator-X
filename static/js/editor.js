@@ -4,10 +4,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const exportBtn = document.getElementById('export-btn');
     const useCustomResolution = document.getElementById('use-custom-resolution');
     const resolutionControls = document.getElementById('resolution-controls');
-    const previewContainer = document.querySelector('.preview-container');
     const MAX_FILE_SIZE = 16 * 1024 * 1024; // 16MB
-
-    let processingEventSource = null;
 
     // Resolution controls visibility
     useCustomResolution.addEventListener('change', function() {
@@ -84,8 +81,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
             if (data.success) {
                 window.timelineManager.items.push({
-                    filepath: data.filepath,
                     filename: data.filename,
+                    file_data: data.file_data,
                     duration: 5,
                     keepAudio: true,
                     startTransition: 'fade',
@@ -99,46 +96,6 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             showAlert('Upload failed: ' + error, 'danger');
         }
-    }
-
-    function updateExportProgress(progress) {
-        const progressBar = document.querySelector('#export-progress .progress-bar');
-        if (!progressBar) {
-            const progressDiv = document.createElement('div');
-            progressDiv.id = 'export-progress';
-            progressDiv.className = 'progress mt-3';
-            progressDiv.innerHTML = `
-                <div class="progress-bar" role="progressbar" style="width: ${progress}%">
-                    ${Math.round(progress)}%
-                </div>
-            `;
-            previewContainer.insertAdjacentElement('afterend', progressDiv);
-        } else {
-            progressBar.style.width = `${progress}%`;
-            progressBar.textContent = `${Math.round(progress)}%`;
-        }
-    }
-
-    function startProgressMonitoring() {
-        if (processingEventSource) {
-            processingEventSource.close();
-        }
-
-        processingEventSource = new EventSource('/progress');
-        processingEventSource.onmessage = function(event) {
-            const progress = parseFloat(event.data);
-            updateExportProgress(progress);
-            
-            if (progress >= 100) {
-                processingEventSource.close();
-                processingEventSource = null;
-            }
-        };
-
-        processingEventSource.onerror = function() {
-            processingEventSource.close();
-            processingEventSource = null;
-        };
     }
 
     async function exportVideo() {
@@ -175,8 +132,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 requestData.resolution = { width, height };
             }
 
-            startProgressMonitoring();
-
             const response = await fetch('/process', {
                 method: 'POST',
                 headers: {
@@ -189,24 +144,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            const data = await response.json();
-            if (data.success) {
-                window.location.href = `/download/${data.output}`;
-                showAlert('Export successful!', 'success');
-            } else {
-                showAlert('Export failed: ' + data.error, 'danger');
-            }
+            // Create a download link for the video
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `output_${Date.now()}.mp4`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            showAlert('Export successful!', 'success');
         } catch (error) {
             showAlert('Export failed: ' + error, 'danger');
         } finally {
             exportBtn.disabled = false;
             exportBtn.innerHTML = 'Export Video';
-            
-            // Remove progress bar
-            const progressDiv = document.getElementById('export-progress');
-            if (progressDiv) {
-                progressDiv.remove();
-            }
         }
     }
 

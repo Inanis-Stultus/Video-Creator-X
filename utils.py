@@ -1,33 +1,28 @@
 import os
+import io
 import logging
 import moviepy.editor as mp
 from moviepy.video.fx import all as vfx
 
 logger = logging.getLogger(__name__)
 
-def get_media_resolution(filepath):
-    """Get the resolution of a media file."""
+def get_media_resolution(clip):
+    """Get the resolution of a media clip."""
     try:
-        if filepath.lower().endswith(('.png', '.jpg', '.jpeg')):
-            clip = mp.ImageClip(filepath)
-        else:
-            clip = mp.VideoFileClip(filepath)
         width, height = clip.size
-        clip.close()
         return width, height
     except Exception as e:
-        logger.error(f"Failed to get resolution for {filepath}: {str(e)}")
+        logger.error(f"Failed to get resolution: {str(e)}")
         return None
 
-def get_max_resolution(timeline):
-    """Get the maximum resolution from all media in timeline."""
+def get_max_resolution(clips):
+    """Get the maximum resolution from all media clips."""
     max_width = 0
     max_height = 0
 
-    for item in timeline:
-        resolution = get_media_resolution(item['filepath'])
-        if resolution:
-            width, height = resolution
+    for clip in clips:
+        if clip:
+            width, height = clip.size
             max_width = max(max_width, width)
             max_height = max(max_height, height)
 
@@ -112,37 +107,45 @@ def apply_transition(clip, transition_type='fade', duration=1.0, position='start
         logger.error(f"Failed to apply transition: {str(e)}")
         return clip
 
-def process_video(timeline, output_path, target_resolution=None):
+def process_video(timeline, output_stream, target_resolution=None):
     """Process video clips according to timeline."""
+    input_clips = []
     clips = []
     transition_duration = 1.0  # Default transition duration
 
     try:
-        # Determine target resolution
-        if target_resolution:
-            target_width, target_height = target_resolution
-        else:
-            target_width, target_height = get_max_resolution(timeline)
-            logger.info(f"Using max resolution from media: {target_width}x{target_height}")
-
-        # Process each item in timeline
+        # Load all clips first
         for item in timeline:
-            filepath = item['filepath']
-            if not os.path.exists(filepath):
-                raise FileNotFoundError(f"File not found: {filepath}")
+            file_data = item.get('file_data')
+            if not file_data:
+                raise ValueError("No file data provided")
 
             duration = float(item.get('duration', 5))
             keep_audio = item.get('keepAudio', True)
 
-            if filepath.lower().endswith(('.png', '.jpg', '.jpeg')):
-                clip = mp.ImageClip(filepath, duration=duration)
-            elif filepath.lower().endswith('.gif'):
-                clip = mp.VideoFileClip(filepath).loop(duration=duration)
+            # Create a BytesIO object from the file data
+            file_buffer = io.BytesIO(file_data)
+
+            if item['filename'].lower().endswith(('.png', '.jpg', '.jpeg')):
+                clip = mp.ImageClip(file_buffer, duration=duration)
+            elif item['filename'].lower().endswith('.gif'):
+                clip = mp.VideoFileClip(file_buffer).loop(duration=duration)
             else:
-                clip = mp.VideoFileClip(filepath)
+                clip = mp.VideoFileClip(file_buffer)
                 if not keep_audio:
                     clip = clip.without_audio()
 
+            input_clips.append(clip)
+
+        # Determine target resolution from loaded clips
+        if target_resolution:
+            target_width, target_height = target_resolution
+        else:
+            target_width, target_height = get_max_resolution(input_clips)
+            logger.info(f"Using max resolution from media: {target_width}x{target_height}")
+
+        # Process each clip
+        for idx, (item, clip) in enumerate(zip(timeline, input_clips)):
             # Resize clip to target resolution with proper centering
             clip = resize_clip_maintain_aspect(clip, target_width, target_height)
 
@@ -179,16 +182,25 @@ def process_video(timeline, output_path, target_resolution=None):
             current_start += clip.duration
 
         final_clip = mp.CompositeVideoClip(final_clips, size=(target_width, target_height))
-        final_clip.write_videofile(output_path, codec='libx264', audio_codec='aac', fps=24)
+        final_clip.write_videofile(output_stream, codec='libx264', audio_codec='aac', fps=24)
 
         # Cleanup clips to free memory
-        for clip in clips:
-            clip.close()
+        for clip in input_clips + clips:
+            try:
+                clip.close()
+            except:
+                pass
         final_clip.close()
 
         return True
     except Exception as e:
         logger.error(f"Video processing failed: {str(e)}")
+        # Cleanup on error
+        for clip in input_clips + clips:
+            try:
+                clip.close()
+            except:
+                pass
         raise
 
 from file_manager import FileManager
