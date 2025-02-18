@@ -150,70 +150,78 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
                 return clip.fx(vfx.fadeout, duration)
 
         elif internal_type == 'dissolve':
-            # Create a dissolve effect using a custom mask
+            # Fixed dissolve effect with proper audio handling
             def make_frame(t):
                 frame = clip.get_frame(t)
+                h, w = frame.shape[:2]
+
                 if internal_position == 'start':
                     if t < duration:
-                        # Create a random dissolve pattern
-                        random_mask = np.random.random(frame.shape[:2])
+                        # Use fixed random seed for consistent pattern
+                        np.random.seed(42)
+                        mask = np.random.random((h, w))
                         threshold = t / duration
-                        mask = random_mask < threshold
+                        mask = mask < threshold
                         mask = np.dstack([mask] * 3)
                         return frame * mask
                     return frame
                 else:
                     remaining = clip.duration - t
                     if remaining < duration:
-                        random_mask = np.random.random(frame.shape[:2])
+                        np.random.seed(42)
+                        mask = np.random.random((h, w))
                         threshold = remaining / duration
-                        mask = random_mask < threshold
+                        mask = mask < threshold
                         mask = np.dstack([mask] * 3)
                         return frame * mask
                     return frame
 
             new_clip = mp.VideoClip(make_frame, duration=clip.duration)
             new_clip.fps = clip.fps
+            # Preserve audio from original clip
+            if clip.audio is not None:
+                new_clip = new_clip.set_audio(clip.audio)
             return new_clip
 
         elif internal_type == 'slide':
-            # Handle slide transitions with proper position management
+            # Fixed slide transition with independent start/end positions
             def get_slide_position(t):
+                original_x, original_y = original_pos(t) if callable(original_pos) else original_pos
+                original_x = 0 if original_x == 'center' else original_x
+
                 if internal_position == 'start':
                     if t < duration:
                         progress = t / duration
-                        # Start from right (-width) and slide to center (0)
-                        x_offset = clip_width * (progress - 1)
+                        # Start from right (screen width) and slide to center
+                        x_offset = clip_width * (1 - progress)
                         return (x_offset, 'center')
                     return ('center', 'center')
                 else:
                     remaining = clip.duration - t
                     if remaining < duration:
-                        progress = 1 - (remaining / duration)
-                        # Start from center (0) and slide to left (+width)
-                        x_offset = clip_width * progress
+                        progress = remaining / duration
+                        # Start at center and slide to left (-screen width)
+                        x_offset = -clip_width * (1 - progress)
                         return (x_offset, 'center')
                     return ('center', 'center')
 
-            # Create a new clip with the sliding position
-            sliding_clip = clip.set_position(get_slide_position)
-            return sliding_clip
+            return clip.set_position(get_slide_position)
 
         elif internal_type == 'zoom':
-            # Handle zoom transitions with proper scale management
+            # Fixed zoom transition with correct scaling
             def get_zoom_scale(t):
                 if internal_position == 'start':
                     if t < duration:
-                        # Start small (0.1) and zoom to normal (1.0)
+                        # Start from 0.2 (small) and zoom to 1.0 (normal)
                         progress = t / duration
-                        return 0.1 + 0.9 * progress
+                        return 0.2 + (0.8 * progress)
                     return 1.0
                 else:
                     remaining = clip.duration - t
                     if remaining < duration:
-                        # Start normal (1.0) and zoom to large (2.0)
-                        progress = 1 - (remaining / duration)
-                        return 1.0 + progress
+                        # Start from 1.0 (normal) and zoom to 0.2 (small)
+                        progress = remaining / duration
+                        return 1.0 - (0.8 * (1 - progress))
                     return 1.0
 
             return clip.fx(vfx.resize, lambda t: get_zoom_scale(t))
