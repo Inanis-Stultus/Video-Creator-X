@@ -2,6 +2,7 @@ import os
 import io
 import logging
 import base64
+import tempfile
 import moviepy.editor as mp
 from moviepy.video.fx import all as vfx
 
@@ -128,84 +129,90 @@ def apply_transition(clip, transition_type='fade', duration=1.0, position='start
         logger.error(f"Failed to apply transition: {str(e)}")
         return clip
 
-def process_video(timeline, output_stream, target_resolution=None):
+def process_video(timeline, output_path, target_resolution=None):
     """Process video clips according to timeline."""
     input_clips = []
     clips = []
+    temp_files = []  # Track temporary files for cleanup
     transition_duration = 1.0  # Default transition duration
 
     try:
-        # Load all clips first
-        for item in timeline:
-            file_data = item.get('file_data')
-            if not file_data:
-                raise ValueError("No file data provided")
+        # Create temporary directory
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Load all clips first
+            for item in timeline:
+                file_data = item.get('file_data')
+                if not file_data:
+                    raise ValueError("No file data provided")
 
-            # Decode base64 data
-            binary_data = base64.b64decode(file_data)
-            file_buffer = io.BytesIO(binary_data)
+                # Decode base64 data and save to temporary file
+                binary_data = base64.b64decode(file_data)
+                temp_path = os.path.join(temp_dir, item['filename'])
+                with open(temp_path, 'wb') as f:
+                    f.write(binary_data)
+                temp_files.append(temp_path)
 
-            duration = float(item.get('duration', 5))
-            keep_audio = item.get('keepAudio', True)
+                duration = float(item.get('duration', 5))
+                keep_audio = item.get('keepAudio', True)
 
-            if item['filename'].lower().endswith(('.png', '.jpg', '.jpeg')):
-                clip = mp.ImageClip(file_buffer, duration=duration)
-            elif item['filename'].lower().endswith('.gif'):
-                clip = mp.VideoFileClip(file_buffer).loop(duration=duration)
+                if item['filename'].lower().endswith(('.png', '.jpg', '.jpeg')):
+                    clip = mp.ImageClip(temp_path, duration=duration)
+                elif item['filename'].lower().endswith('.gif'):
+                    clip = mp.VideoFileClip(temp_path).loop(duration=duration)
+                else:
+                    clip = mp.VideoFileClip(temp_path)
+                    if not keep_audio:
+                        clip = clip.without_audio()
+
+                input_clips.append(clip)
+
+            # Determine target resolution from loaded clips
+            if target_resolution:
+                target_width, target_height = target_resolution
             else:
-                clip = mp.VideoFileClip(file_buffer)
-                if not keep_audio:
-                    clip = clip.without_audio()
+                target_width, target_height = get_max_resolution(input_clips)
+                logger.info(f"Using max resolution from media: {target_width}x{target_height}")
 
-            input_clips.append(clip)
+            # Process each clip
+            for idx, (item, clip) in enumerate(zip(timeline, input_clips)):
+                # Resize clip to target resolution with proper centering
+                clip = resize_clip_maintain_aspect(clip, target_width, target_height)
 
-        # Determine target resolution from loaded clips
-        if target_resolution:
-            target_width, target_height = target_resolution
-        else:
-            target_width, target_height = get_max_resolution(input_clips)
-            logger.info(f"Using max resolution from media: {target_width}x{target_height}")
+                # Apply filters
+                if item.get('filter'):
+                    clip = apply_filter(clip, item['filter'])
 
-        # Process each clip
-        for idx, (item, clip) in enumerate(zip(timeline, input_clips)):
-            # Resize clip to target resolution with proper centering
-            clip = resize_clip_maintain_aspect(clip, target_width, target_height)
+                # Apply transitions
+                start_transition = item.get('startTransition', 'fade')
+                end_transition = item.get('endTransition', 'fade')
 
-            # Apply filters
-            if item.get('filter'):
-                clip = apply_filter(clip, item['filter'])
+                if start_transition != 'none':
+                    clip = apply_transition(clip, start_transition, transition_duration, 'start')
+                if end_transition != 'none':
+                    clip = apply_transition(clip, end_transition, transition_duration, 'end')
 
-            # Apply transitions
-            start_transition = item.get('startTransition', 'fade')
-            end_transition = item.get('endTransition', 'fade')
+                clips.append(clip)
 
-            if start_transition != 'none':
-                clip = apply_transition(clip, start_transition, transition_duration, 'start')
-            if end_transition != 'none':
-                clip = apply_transition(clip, end_transition, transition_duration, 'end')
+            # Ensure clips don't overlap during transitions
+            final_clips = []
+            current_start = 0
+            for clip in clips:
+                clip = clip.set_start(current_start)
+                final_clips.append(clip)
+                current_start += clip.duration - transition_duration
 
-            clips.append(clip)
+            final_clip = mp.CompositeVideoClip(final_clips, size=(target_width, target_height))
+            final_clip.write_videofile(output_path, codec='libx264', audio_codec='aac', fps=24)
 
-        # Ensure clips don't overlap during transitions
-        final_clips = []
-        current_start = 0
-        for clip in clips:
-            clip = clip.set_start(current_start)
-            final_clips.append(clip)
-            current_start += clip.duration
+            # Cleanup clips to free memory
+            for clip in input_clips + clips:
+                try:
+                    clip.close()
+                except:
+                    pass
+            final_clip.close()
 
-        final_clip = mp.CompositeVideoClip(final_clips, size=(target_width, target_height))
-        final_clip.write_videofile(output_stream, codec='libx264', audio_codec='aac', fps=24)
-
-        # Cleanup clips to free memory
-        for clip in input_clips + clips:
-            try:
-                clip.close()
-            except:
-                pass
-        final_clip.close()
-
-        return True
+            return True
     except Exception as e:
         logger.error(f"Video processing failed: {str(e)}")
         # Cleanup on error

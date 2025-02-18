@@ -2,6 +2,7 @@ import os
 import io
 import logging
 import base64
+import tempfile
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, send_file, Response
 from werkzeug.utils import secure_filename
@@ -81,23 +82,32 @@ def process():
             height = int(data['resolution'].get('height', 1080))
             target_resolution = (width, height)
 
-        # Create output buffer
-        output_buffer = io.BytesIO()
-
-        # Process video with progress tracking
-        process_video(timeline, output_buffer, target_resolution)
-
-        # Prepare response
-        output_buffer.seek(0)
+        # Create temporary file for output
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         output_filename = f'output_{timestamp}.mp4'
 
-        return send_file(
-            output_buffer,
-            as_attachment=True,
-            download_name=output_filename,
-            mimetype='video/mp4'
-        )
+        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as temp_output:
+            try:
+                # Process video
+                process_video(timeline, temp_output.name, target_resolution)
+
+                # Read the processed video file
+                with open(temp_output.name, 'rb') as f:
+                    video_data = f.read()
+
+                # Create response
+                return send_file(
+                    io.BytesIO(video_data),
+                    mimetype='video/mp4',
+                    as_attachment=True,
+                    download_name=output_filename
+                )
+            finally:
+                # Clean up temporary file
+                try:
+                    os.unlink(temp_output.name)
+                except:
+                    pass
 
     except Exception as e:
         logger.error(f"Processing error: {str(e)}")
