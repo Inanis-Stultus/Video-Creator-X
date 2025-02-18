@@ -41,24 +41,27 @@ def resize_clip_maintain_aspect(clip, target_width, target_height):
         orig_aspect = orig_width / orig_height
         target_aspect = target_width / target_height
 
-        # Create a black background clip for the entire duration
+        # Create a black background clip
         bg_clip = mp.ColorClip(size=(target_width, target_height), color=(0, 0, 0))
         bg_clip = bg_clip.set_duration(clip.duration)
 
-        if orig_aspect > target_aspect:  # Width is the limiting factor
+        # Calculate new dimensions maintaining aspect ratio
+        if orig_aspect > target_aspect:
             new_width = target_width
             new_height = int(target_width / orig_aspect)
-            scaled_clip = clip.resize(width=new_width, height=new_height)
-            y_position = (target_height - new_height) // 2
-            positioned_clip = scaled_clip.set_position(("center", y_position))
-        else:  # Height is the limiting factor
+        else:
             new_height = target_height
             new_width = int(target_height * orig_aspect)
-            scaled_clip = clip.resize(width=new_width, height=new_height)
-            x_position = (target_width - new_width) // 2
-            positioned_clip = scaled_clip.set_position((x_position, "center"))
 
-        return mp.CompositeVideoClip([bg_clip, positioned_clip], size=(target_width, target_height))
+        # Resize with updated PIL parameters
+        resized_clip = clip.resize(width=new_width, height=new_height)
+
+        # Center the clip
+        x_pos = (target_width - new_width) // 2
+        y_pos = (target_height - new_height) // 2
+
+        positioned_clip = resized_clip.set_position((x_pos, y_pos))
+        return mp.CompositeVideoClip([bg_clip, positioned_clip])
     except Exception as e:
         logger.error(f"Failed to resize clip: {str(e)}")
         return clip
@@ -69,8 +72,6 @@ def apply_transition(clip, transition_type='fade', duration=1.0, position='start
         if transition_type == 'none':
             return clip
 
-        # Store original position and size
-        original_pos = clip.pos if hasattr(clip, 'pos') else lambda t: ('center', 'center')
         clip_width, clip_height = clip.size
 
         if transition_type == 'fade':
@@ -83,31 +84,40 @@ def apply_transition(clip, transition_type='fade', duration=1.0, position='start
                 def slide_pos(t):
                     if t < duration:
                         progress = t / duration
-                        return (-clip_width + (clip_width * progress), original_pos(t)[1])
-                    return original_pos(t)
+                        return (-clip_width + (clip_width * progress), 'center')
+                    return ('center', 'center')
                 return clip.set_position(slide_pos)
             else:
                 def slide_pos(t):
                     if t > clip.duration - duration:
                         progress = (t - (clip.duration - duration)) / duration
-                        return (clip_width * progress, original_pos(t)[1])
-                    return original_pos(t)
+                        return (clip_width * progress, 'center')
+                    return ('center', 'center')
                 return clip.set_position(slide_pos)
         elif transition_type == 'zoom':
             if position == 'start':
                 def zoom_scale(t):
                     if t < duration:
-                        return 1.5 + 4 * (1 - t / duration)
-                    return 1
-                zoomed_clip = clip.resize(zoom_scale)
-                return zoomed_clip.set_position(original_pos)
+                        # Start from scale 0.2 and zoom in to 1.0
+                        progress = t / duration
+                        return 0.2 + (0.8 * progress)
+                    return 1.0
+
+                # Apply zoom effect
+                zoomed = clip.resize(lambda t: zoom_scale(t))
+                return zoomed.set_position('center')
             else:
                 def zoom_scale(t):
                     if t > clip.duration - duration:
-                        return 1 + 0.9 * ((t - (clip.duration - duration)) / duration)
-                    return 1
-                zoomed_clip = clip.resize(zoom_scale)
-                return zoomed_clip.set_position(original_pos)
+                        # Start from scale 1.0 and zoom out to 0.2
+                        progress = (t - (clip.duration - duration)) / duration
+                        return 1.0 - (0.8 * progress)
+                    return 1.0
+
+                # Apply zoom effect
+                zoomed = clip.resize(lambda t: zoom_scale(t))
+                return zoomed.set_position('center')
+
         return clip
     except Exception as e:
         logger.error(f"Failed to apply transition: {str(e)}")
@@ -166,7 +176,7 @@ def process_video(timeline, output_path, target_resolution=None):
                     except Exception as e:
                         logger.error(f"Failed to apply effect {effect}: {str(e)}")
 
-            # Apply separate transitions for start and end
+            # Apply transitions
             start_transition = item.get('startTransition', 'fade')
             end_transition = item.get('endTransition', 'fade')
 
@@ -187,12 +197,13 @@ def process_video(timeline, output_path, target_resolution=None):
         for clip in clips:
             clip = clip.set_start(current_start)
             final_clips.append(clip)
-            current_start += clip.duration
+            current_start += clip.duration - (transition_duration / 2)
 
+        # Create final composition
         final_clip = mp.CompositeVideoClip(final_clips, size=(target_width, target_height))
         final_clip.write_videofile(output_path, codec='libx264', audio_codec='aac', fps=24)
 
-        # Cleanup clips to free memory
+        # Cleanup clips
         for clip in clips:
             clip.close()
         final_clip.close()
