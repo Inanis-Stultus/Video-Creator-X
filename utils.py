@@ -150,24 +150,80 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
                 return clip.fx(vfx.fadeout, duration)
 
         elif internal_type == 'dissolve':
+            # Create a dissolve effect using a custom mask
             def make_frame(t):
                 frame = clip.get_frame(t)
                 if internal_position == 'start':
-                    alpha = min(1, t/duration) if t < duration else 1
+                    if t < duration:
+                        # Create a random dissolve pattern
+                        random_mask = np.random.random(frame.shape[:2])
+                        threshold = t / duration
+                        mask = random_mask < threshold
+                        mask = np.dstack([mask] * 3)
+                        return frame * mask
+                    return frame
                 else:
                     remaining = clip.duration - t
-                    alpha = min(1, remaining/duration) if remaining < duration else 1
-                return frame * alpha
+                    if remaining < duration:
+                        random_mask = np.random.random(frame.shape[:2])
+                        threshold = remaining / duration
+                        mask = random_mask < threshold
+                        mask = np.dstack([mask] * 3)
+                        return frame * mask
+                    return frame
 
             new_clip = mp.VideoClip(make_frame, duration=clip.duration)
             new_clip.fps = clip.fps
             return new_clip
+
+        elif internal_type == 'slide':
+            # Handle slide transitions with proper position management
+            def get_slide_position(t):
+                if internal_position == 'start':
+                    if t < duration:
+                        progress = t / duration
+                        # Start from right (-width) and slide to center (0)
+                        x_offset = clip_width * (progress - 1)
+                        return (x_offset, 'center')
+                    return ('center', 'center')
+                else:
+                    remaining = clip.duration - t
+                    if remaining < duration:
+                        progress = 1 - (remaining / duration)
+                        # Start from center (0) and slide to left (+width)
+                        x_offset = clip_width * progress
+                        return (x_offset, 'center')
+                    return ('center', 'center')
+
+            # Create a new clip with the sliding position
+            sliding_clip = clip.set_position(get_slide_position)
+            return sliding_clip
+
+        elif internal_type == 'zoom':
+            # Handle zoom transitions with proper scale management
+            def get_zoom_scale(t):
+                if internal_position == 'start':
+                    if t < duration:
+                        # Start small (0.1) and zoom to normal (1.0)
+                        progress = t / duration
+                        return 0.1 + 0.9 * progress
+                    return 1.0
+                else:
+                    remaining = clip.duration - t
+                    if remaining < duration:
+                        # Start normal (1.0) and zoom to large (2.0)
+                        progress = 1 - (remaining / duration)
+                        return 1.0 + progress
+                    return 1.0
+
+            return clip.fx(vfx.resize, lambda t: get_zoom_scale(t))
 
         elif internal_type == 'wipe':
             def make_frame(t):
                 frame = clip.get_frame(t)
                 h, w = frame.shape[:2]
                 mask = np.zeros((h, w))
+
                 if internal_position == 'start':
                     if t < duration:
                         edge = int(w * (t/duration))
@@ -188,21 +244,6 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
             new_clip = mp.VideoClip(make_frame, duration=clip.duration)
             new_clip.fps = clip.fps
             return new_clip
-
-        elif internal_type == 'slide':
-            if internal_position == 'start':
-                def slide_pos(t):
-                    if t < duration:
-                        return (clip_width * (t/duration - 1), 'center')
-                    return ('center', 'center')
-                return clip.set_position(slide_pos)
-            else:
-                def slide_pos(t):
-                    remaining = clip.duration - t
-                    if remaining < duration:
-                        return (clip_width * (1 - remaining/duration), 'center')
-                    return ('center', 'center')
-                return clip.set_position(slide_pos)
 
         elif internal_type == 'rotate':
             def make_frame(t):
@@ -235,21 +276,6 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
             new_clip = mp.VideoClip(make_frame, duration=clip.duration)
             new_clip.fps = clip.fps
             return new_clip
-
-        elif internal_type == 'zoom':
-            if internal_position == 'start':
-                def scale_func(t):
-                    if t < duration:
-                        return 0.1 + 0.9 * (t/duration)
-                    return 1.0
-                return clip.fx(vfx.resize, lambda t: scale_func(t))
-            else:
-                def scale_func(t):
-                    remaining = clip.duration - t
-                    if remaining < duration:
-                        return 0.1 + 0.9 * (remaining/duration)
-                    return 1.0
-                return clip.fx(vfx.resize, lambda t: scale_func(t))
 
         elif internal_type == 'blur':
             def make_frame(t):
