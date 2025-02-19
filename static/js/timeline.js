@@ -136,10 +136,19 @@ class Timeline {
                                     <label>Start Transition</label>
                                     <select class="form-control" 
                                         onchange="window.timelineManager.updateTransition(${index}, this.value, 'start')">
-                                        <option value="fade" ${item.startTransition === 'fade' ? 'selected' : ''}>Fade</option>
-                                        <option value="slide" ${item.startTransition === 'slide' ? 'selected' : ''}>Slide</option>
-                                        <option value="zoom" ${item.startTransition === 'zoom' ? 'selected' : ''}>Zoom</option>
-                                        <option value="none" ${item.startTransition === 'none' ? 'selected' : ''}>None</option>
+                                        <option value="none">None</option>
+                                        <option value="fade-in" ${item.startTransition === 'fade-in' ? 'selected' : ''}>Fade In</option>
+                                        <option value="dissolve-in" ${item.startTransition === 'dissolve-in' ? 'selected' : ''}>Dissolve In</option>
+                                        <option value="wipe-right" ${item.startTransition === 'wipe-right' ? 'selected' : ''}>Wipe Right</option>
+                                        <option value="slide-right" ${item.startTransition === 'slide-right' ? 'selected' : ''}>Slide Right</option>
+                                        <option value="rotate-in" ${item.startTransition === 'rotate-in' ? 'selected' : ''}>Rotate In</option>
+                                        <option value="zoom-in" ${item.startTransition === 'zoom-in' ? 'selected' : ''}>Zoom In</option>
+                                        <option value="blur-in" ${item.startTransition === 'blur-in' ? 'selected' : ''}>Blur In</option>
+                                        <option value="cross-dissolve-in" ${item.startTransition === 'cross-dissolve-in' ? 'selected' : ''}>Cross Dissolve</option>
+                                        <option value="circular-in" ${item.startTransition === 'circular-in' ? 'selected' : ''}>Circular Wipe</option>
+                                        <option value="diagonal-in" ${item.startTransition === 'diagonal-in' ? 'selected' : ''}>Diagonal Wipe</option>
+                                        <option value="split-in" ${item.startTransition === 'split-in' ? 'selected' : ''}>Split Screen</option>
+                                        <option value="pixelate-in" ${item.startTransition === 'pixelate-in' ? 'selected' : ''}>Pixelate</option>
                                     </select>
                                 </div>
                             </div>
@@ -148,25 +157,41 @@ class Timeline {
                                     <label>End Transition</label>
                                     <select class="form-control" 
                                         onchange="window.timelineManager.updateTransition(${index}, this.value, 'end')">
-                                        <option value="fade" ${item.endTransition === 'fade' ? 'selected' : ''}>Fade</option>
-                                        <option value="slide" ${item.endTransition === 'slide' ? 'selected' : ''}>Slide</option>
-                                        <option value="zoom" ${item.endTransition === 'zoom' ? 'selected' : ''}>Zoom</option>
-                                        <option value="none" ${item.endTransition === 'none' ? 'selected' : ''}>None</option>
+                                        <option value="none">None</option>
+                                        <option value="fade-out" ${item.endTransition === 'fade-out' ? 'selected' : ''}>Fade Out</option>
+                                        <option value="dissolve-out" ${item.endTransition === 'dissolve-out' ? 'selected' : ''}>Dissolve Out</option>
+                                        <option value="wipe-left" ${item.endTransition === 'wipe-left' ? 'selected' : ''}>Wipe Left</option>
+                                        <option value="slide-left" ${item.endTransition === 'slide-left' ? 'selected' : ''}>Slide Left</option>
+                                        <option value="rotate-out" ${item.endTransition === 'rotate-out' ? 'selected' : ''}>Rotate Out</option>
+                                        <option value="zoom-out" ${item.endTransition === 'zoom-out' ? 'selected' : ''}>Zoom Out</option>
+                                        <option value="blur-out" ${item.endTransition === 'blur-out' ? 'selected' : ''}>Blur Out</option>
+                                        <option value="cross-dissolve-out" ${item.endTransition === 'cross-dissolve-out' ? 'selected' : ''}>Cross Dissolve</option>
+                                        <option value="circular-out" ${item.endTransition === 'circular-out' ? 'selected' : ''}>Circular Wipe</option>
+                                        <option value="diagonal-out" ${item.endTransition === 'diagonal-out' ? 'selected' : ''}>Diagonal Wipe</option>
+                                        <option value="split-out" ${item.endTransition === 'split-out' ? 'selected' : ''}>Split Screen</option>
+                                        <option value="pixelate-out" ${item.endTransition === 'pixelate-out' ? 'selected' : ''}>Pixelate</option>
                                     </select>
                                 </div>
                             </div>
                         </div>
                         <div class="form-group mb-3">
-                            <label>Filter</label>
+                            <label>Filter Effect</label>
                             <select class="form-control" 
                                 onchange="window.timelineManager.updateFilter(${index}, this.value)">
-                                <option value="none" ${item.filter === 'none' ? 'selected' : ''}>None</option>
-                                <option value="grayscale" ${item.filter === 'grayscale' ? 'selected' : ''}>Grayscale</option>
+                                <option value="none" ${!item.filter || item.filter === 'none' ? 'selected' : ''}>No Filter</option>
+                                <option value="grayscale" ${item.filter === 'grayscale' ? 'selected' : ''}>Black & White</option>
+                                <option value="sepia" ${item.filter === 'sepia' ? 'selected' : ''}>Sepia Tone</option>
                                 <option value="blur" ${item.filter === 'blur' ? 'selected' : ''}>Blur</option>
-                                <option value="bright" ${item.filter === 'bright' ? 'selected' : ''}>Bright</option>
-                                <option value="dark" ${item.filter === 'dark' ? 'selected' : ''}>Dark</option>
+                                <option value="sharpen" ${item.filter === 'sharpen' ? 'selected' : ''}>Sharpen</option>
+                                <option value="bright" ${item.filter === 'bright' ? 'selected' : ''}>Brighten</option>
+                                <option value="dark" ${item.filter === 'dark' ? 'selected' : ''}>Darken</option>
                                 <option value="contrast" ${item.filter === 'contrast' ? 'selected' : ''}>High Contrast</option>
                                 <option value="mirror" ${item.filter === 'mirror' ? 'selected' : ''}>Mirror</option>
+                                <option value="vintage" ${item.filter === 'vintage' ? 'selected' : ''}>Vintage</option>
+                                <option value="edge" ${item.filter === 'edge' ? 'selected' : ''}>Edge Detection</option>
+                                <option value="saturate" ${item.filter === 'saturate' ? 'selected' : ''}>Saturate</option>
+                                <option value="blue_tint" ${item.filter === 'blue_tint' ? 'selected' : ''}>Blue Tint</option>
+                                <option value="denoise" ${item.filter === 'denoise' ? 'selected' : ''}>Denoise</option>
                             </select>
                         </div>
                         <div class="form-check mb-3">

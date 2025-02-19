@@ -96,6 +96,42 @@ def apply_filter(clip, filter_type):
             return clip.fx(vfx.lum_contrast, contrast=50)
         elif filter_type == 'mirror':
             return clip.fx(vfx.mirror_x)
+        # New filters
+        elif filter_type == 'vintage':
+            def vintage_effect(frame):
+                # Add warm tint and slight grain
+                frame = cv2.convertScaleAbs(frame, alpha=1.1, beta=10)
+                noise = np.random.normal(0, 5, frame.shape).astype(np.uint8)
+                frame = cv2.add(frame, noise)
+                # Reduce saturation slightly
+                hsv = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
+                hsv[...,1] = hsv[...,1] * 0.8
+                return cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
+            return clip.fl_image(vintage_effect)
+        elif filter_type == 'edge':
+            def edge_detection(frame):
+                gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+                edges = cv2.Canny(gray, 100, 200)
+                return cv2.cvtColor(edges, cv2.COLOR_GRAY2RGB)
+            return clip.fl_image(edge_detection)
+        elif filter_type == 'saturate':
+            def increase_saturation(frame):
+                hsv = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
+                hsv[...,1] = hsv[...,1] * 1.5
+                return cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
+            return clip.fl_image(increase_saturation)
+        elif filter_type == 'blue_tint':
+            def add_blue_tint(frame):
+                frame = frame.astype(float)
+                frame[..., 0] = np.clip(frame[..., 0] * 0.7, 0, 255)  # Reduce red
+                frame[..., 1] = np.clip(frame[..., 1] * 0.85, 0, 255)  # Reduce green slightly
+                frame[..., 2] = np.clip(frame[..., 2] * 1.2, 0, 255)  # Increase blue
+                return frame.astype(np.uint8)
+            return clip.fl_image(add_blue_tint)
+        elif filter_type == 'denoise':
+            def reduce_noise(frame):
+                return cv2.fastNlMeansDenoisingColored(frame, None, 10, 10, 7, 21)
+            return clip.fl_image(reduce_noise)
         return clip
     except Exception as e:
         logger.error(f"Failed to apply filter {filter_type}: {str(e)}")
@@ -126,12 +162,102 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
             'zoom-in': ('zoom', 'start'),
             'zoom-out': ('zoom', 'end'),
             'blur-in': ('blur', 'start'),
-            'blur-out': ('blur', 'end')
+            'blur-out': ('blur', 'end'),
+            # New transitions
+            'cross-dissolve-in': ('cross-dissolve', 'start'),
+            'cross-dissolve-out': ('cross-dissolve', 'end'),
+            'circular-in': ('circular', 'start'),
+            'circular-out': ('circular', 'end'),
+            'diagonal-in': ('diagonal', 'start'),
+            'diagonal-out': ('diagonal', 'end'),
+            'split-in': ('split', 'start'),
+            'split-out': ('split', 'end'),
+            'pixelate-in': ('pixelate', 'start'),
+            'pixelate-out': ('pixelate', 'end')
         }
 
         internal_type, internal_position = transition_map.get(transition_type, (transition_type, position))
 
-        if internal_type == 'fade':
+        if internal_type == 'cross-dissolve':
+            def make_frame(t):
+                frame = clip.get_frame(t)
+                if internal_position == 'start':
+                    progress = min(1, t / duration) if t < duration else 1
+                else:
+                    progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
+                return frame * progress
+            return create_clip_with_audio(clip, make_frame)
+
+        elif internal_type == 'circular':
+            def make_frame(t):
+                frame = clip.get_frame(t)
+                h, w = frame.shape[:2]
+                center = (w//2, h//2)
+                max_radius = np.sqrt(w**2 + h**2)
+
+                if internal_position == 'start':
+                    progress = min(1, t / duration) if t < duration else 1
+                else:
+                    progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
+
+                radius = int(max_radius * progress)
+                mask = np.zeros((h, w))
+                cv2.circle(mask, center, radius, 1, -1)
+                return frame * mask[..., np.newaxis]
+            return create_clip_with_audio(clip, make_frame)
+
+        elif internal_type == 'diagonal':
+            def make_frame(t):
+                frame = clip.get_frame(t)
+                h, w = frame.shape[:2]
+                if internal_position == 'start':
+                    progress = min(1, t / duration) if t < duration else 1
+                else:
+                    progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
+
+                diagonal_pos = int((w + h) * progress)
+                mask = np.zeros((h, w))
+                for i in range(h):
+                    for j in range(w):
+                        if i + j < diagonal_pos:
+                            mask[i,j] = 1
+                return frame * mask[..., np.newaxis]
+            return create_clip_with_audio(clip, make_frame)
+
+        elif internal_type == 'split':
+            def make_frame(t):
+                frame = clip.get_frame(t)
+                h, w = frame.shape[:2]
+                if internal_position == 'start':
+                    progress = min(1, t / duration) if t < duration else 1
+                else:
+                    progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
+
+                split_pos = int(w * progress)
+                mask = np.zeros((h, w))
+                mask[:, :split_pos] = 1
+                mask[:, w-split_pos:] = 1
+                return frame * mask[..., np.newaxis]
+            return create_clip_with_audio(clip, make_frame)
+
+        elif internal_type == 'pixelate':
+            def make_frame(t):
+                frame = clip.get_frame(t)
+                h, w = frame.shape[:2]
+                if internal_position == 'start':
+                    progress = min(1, t / duration) if t < duration else 1
+                else:
+                    progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
+
+                # Calculate pixel size based on progress
+                pixel_size = max(1, int((1 - progress) * 30))
+                if pixel_size > 1:
+                    temp = cv2.resize(frame, (w//pixel_size, h//pixel_size), interpolation=cv2.INTER_LINEAR)
+                    return cv2.resize(temp, (w, h), interpolation=cv2.INTER_NEAREST)
+                return frame
+            return create_clip_with_audio(clip, make_frame)
+
+        elif internal_type == 'fade':
             if internal_position == 'start':
                 return clip.fx(vfx.fadein, duration)
             else:
@@ -296,6 +422,14 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
     except Exception as e:
         logger.error(f"Failed to apply transition: {str(e)}")
         return clip
+
+def create_clip_with_audio(original_clip, make_frame_func):
+    """Helper function to create a new clip while preserving audio"""
+    new_clip = mp.VideoClip(make_frame_func, duration=original_clip.duration)
+    new_clip.fps = original_clip.fps
+    if original_clip.audio is not None:
+        new_clip = new_clip.set_audio(original_clip.audio)
+    return new_clip
 
 def process_video(timeline, output_path, target_resolution=None):
     """Process video clips according to timeline."""
