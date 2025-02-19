@@ -573,10 +573,9 @@ def process_video(timeline, output_path, target_resolution=None):
                         clip = mp.VideoFileClip(temp_path).loop(duration=duration)
                     else:
                         clip = mp.VideoFileClip(temp_path)
-                        if not keep_audio and hasattr(clip, 'audio'):
+                        # Preserve audio based on keepAudio flag
+                        if not keep_audio and hasattr(clip, 'audio') and clip.audio is not None:
                             clip = clip.without_audio()
-                        elif keep_audio and not hasattr(clip, 'audio'):
-                            logger.warning(f"No audio found in clip: {item['filename']}")
 
                     input_clips.append(clip)
                     logger.info(f"Successfully loaded clip: {item['filename']}")
@@ -597,13 +596,13 @@ def process_video(timeline, output_path, target_resolution=None):
                     # Resize clip to target resolution with proper centering
                     clip = resize_clip_maintain_aspect(clip, target_width, target_height)
 
-                    # Apply filters
+                    # Apply filters if any
                     if item.get('filter'):
                         clip = apply_filter(clip, item['filter'])
 
                     # Apply transitions
-                    start_transition = item.get('startTransition', 'fade-in')
-                    end_transition = item.get('endTransition', 'fade-out')
+                    start_transition = item.get('startTransition', 'fade')
+                    end_transition = item.get('endTransition', 'fade')
 
                     if start_transition != 'none':
                         clip = apply_transition(clip, start_transition, transition_duration, 'start')
@@ -616,16 +615,13 @@ def process_video(timeline, output_path, target_resolution=None):
                     logger.error(f"Failed to process clip {idx + 1}: {str(e)}")
                     raise
 
-            # Ensure clips don't overlap during transitions by calculating proper start times
+            # Ensure clips don't overlap during transitions
             final_clips = []
             current_start = 0
-            for idx, clip in enumerate(clips):
-                # Set the start time for the current clip
+            for clip in clips:
+                # Set the start time for each clip
                 clip = clip.set_start(current_start)
                 final_clips.append(clip)
-
-                # Calculate the next start time:
-                # Move the start time by the full duration of the current clip
                 current_start += clip.duration
 
             final_clip = mp.CompositeVideoClip(final_clips, size=(target_width, target_height))
