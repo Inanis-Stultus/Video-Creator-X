@@ -144,11 +144,11 @@ class Timeline {
                                         <option value="rotate-in" ${item.startTransition === 'rotate-in' ? 'selected' : ''}>Rotate In</option>
                                         <option value="zoom-in" ${item.startTransition === 'zoom-in' ? 'selected' : ''}>Zoom In</option>
                                         <option value="blur-in" ${item.startTransition === 'blur-in' ? 'selected' : ''}>Blur In</option>
-                                        <option value="ripple-in" ${item.startTransition === 'ripple-in' ? 'selected' : ''}>Ripple</option>
-                                        <option value="spiral-in" ${item.startTransition === 'spiral-in' ? 'selected' : ''}>Spiral</option>
-                                        <option value="matrix-in" ${item.startTransition === 'matrix-in' ? 'selected' : ''}>Digital Rain</option>
-                                        <option value="heart-in" ${item.startTransition === 'heart-in' ? 'selected' : ''}>Heart Wipe</option>
-                                        <option value="shatter-in" ${item.startTransition === 'shatter-in' ? 'selected' : ''}>Shatter</option>
+                                        <option value="ripple-in" ${item.startTransition === 'ripple-in' ? 'selected' : ''}>Ripple In</option>
+                                        <option value="spiral-in" ${item.startTransition === 'spiral-in' ? 'selected' : ''}>Spiral In</option>
+                                        <option value="matrix-in" ${item.startTransition === 'matrix-in' ? 'selected' : ''}>Digital Rain In</option>
+                                        <option value="heart-in" ${item.startTransition === 'heart-in' ? 'selected' : ''}>Heart Wipe In</option>
+                                        <option value="shatter-in" ${item.startTransition === 'shatter-in' ? 'selected' : ''}>Shatter In</option>
                                     </select>
                                 </div>
                             </div>
@@ -165,11 +165,11 @@ class Timeline {
                                         <option value="rotate-out" ${item.endTransition === 'rotate-out' ? 'selected' : ''}>Rotate Out</option>
                                         <option value="zoom-out" ${item.endTransition === 'zoom-out' ? 'selected' : ''}>Zoom Out</option>
                                         <option value="blur-out" ${item.endTransition === 'blur-out' ? 'selected' : ''}>Blur Out</option>
-                                        <option value="ripple-out" ${item.endTransition === 'ripple-out' ? 'selected' : ''}>Ripple</option>
-                                        <option value="spiral-out" ${item.endTransition === 'spiral-out' ? 'selected' : ''}>Spiral</option>
-                                        <option value="matrix-out" ${item.endTransition === 'matrix-out' ? 'selected' : ''}>Digital Rain</option>
-                                        <option value="heart-out" ${item.endTransition === 'heart-out' ? 'selected' : ''}>Heart Wipe</option>
-                                        <option value="shatter-out" ${item.endTransition === 'shatter-out' ? 'selected' : ''}>Shatter</option>
+                                        <option value="ripple-out" ${item.endTransition === 'ripple-out' ? 'selected' : ''}>Ripple Out</option>
+                                        <option value="spiral-out" ${item.endTransition === 'spiral-out' ? 'selected' : ''}>Spiral Out</option>
+                                        <option value="matrix-out" ${item.endTransition === 'matrix-out' ? 'selected' : ''}>Digital Rain Out</option>
+                                        <option value="heart-out" ${item.endTransition === 'heart-out' ? 'selected' : ''}>Heart Wipe Out</option>
+                                        <option value="shatter-out" ${item.endTransition === 'shatter-out' ? 'selected' : ''}>Shatter Out</option>
                                     </select>
                                 </div>
                             </div>

@@ -241,7 +241,140 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
         internal_type, internal_position = transition_map.get(transition_type, (transition_type, position))
 
         # Keep all existing transition effects unchanged
-        if internal_type == 'fade':
+
+        # New transition effects start here
+        if internal_type == 'ripple':
+            def make_frame(t):
+                frame = clip.get_frame(t)
+                h, w = frame.shape[:2]
+
+                if internal_position == 'start':
+                    progress = min(1, t / duration) if t < duration else 1
+                else:
+                    progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
+
+                center = (w//2, h//2)
+                max_radius = np.sqrt(w**2 + h**2)
+                radius = int(max_radius * progress)
+
+                # Create ripple effect
+                y, x = np.ogrid[:h, :w]
+                dist = np.sqrt((x - center[0])**2 + (y - center[1])**2)
+                ripple = np.sin(dist/10 - radius/10) * progress
+                ripple = np.dstack([ripple, ripple, ripple])
+
+                return cv2.addWeighted(frame, 1-progress, (frame * (1 + ripple)).clip(0, 255).astype(np.uint8), progress, 0)
+
+            return create_clip_with_audio(clip, make_frame)
+
+        elif internal_type == 'spiral':
+            def make_frame(t):
+                frame = clip.get_frame(t)
+                h, w = frame.shape[:2]
+
+                if internal_position == 'start':
+                    progress = min(1, t / duration) if t < duration else 1
+                else:
+                    progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
+
+                center = (w//2, h//2)
+                y, x = np.ogrid[:h, :w]
+                dist = np.sqrt((x - center[0])**2 + (y - center[1])**2)
+                angle = np.arctan2(y - center[1], x - center[0])
+                mask = (angle + dist/10) < (progress * 20)
+                mask = mask.astype(np.float32)
+                mask = np.dstack([mask, mask, mask])
+
+                return (frame * mask).astype(np.uint8)
+
+            return create_clip_with_audio(clip, make_frame)
+
+        elif internal_type == 'matrix':
+            def make_frame(t):
+                frame = clip.get_frame(t)
+                h, w = frame.shape[:2]
+
+                if internal_position == 'start':
+                    progress = min(1, t / duration) if t < duration else 1
+                else:
+                    progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
+
+                # Create digital rain effect
+                matrix = np.random.rand(h, w) < (progress * 0.3)
+                rain = np.roll(matrix, int(progress * h//2), axis=0)
+                rain = np.dstack([rain * 0.1, rain * 0.8, rain * 0.3])  # Green tint
+
+                return cv2.addWeighted(frame, progress, (rain * 255).astype(np.uint8), 1-progress, 0)
+
+            return create_clip_with_audio(clip, make_frame)
+
+        elif internal_type == 'heart':
+            def make_frame(t):
+                frame = clip.get_frame(t)
+                h, w = frame.shape[:2]
+
+                if internal_position == 'start':
+                    progress = min(1, t / duration) if t < duration else 1
+                else:
+                    progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
+
+                # Create heart shape mask
+                center = (w//2, h//2)
+                size = int(min(w, h) * progress)
+                mask = np.zeros((h, w))
+                y, x = np.ogrid[:h, :w]
+                # Heart shape equation
+                inside_heart = ((x - center[0])**2 + (y - center[1])**2 - size**2)**3 - (x - center[0])**2 * (y - center[1])**3 < 0
+                mask[inside_heart] = 1
+                mask = np.dstack([mask, mask, mask])
+
+                return (frame * mask).astype(np.uint8)
+
+            return create_clip_with_audio(clip, make_frame)
+
+        elif internal_type == 'shatter':
+            def make_frame(t):
+                frame = clip.get_frame(t)
+                h, w = frame.shape[:2]
+
+                if internal_position == 'start':
+                    progress = min(1, t / duration) if t < duration else 1
+                else:
+                    progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
+
+                # Create shatter effect
+                pieces = 20
+                piece_h = h // pieces
+                piece_w = w // pieces
+                shattered = np.zeros_like(frame)
+
+                for i in range(pieces):
+                    for j in range(pieces):
+                        y1 = i * piece_h
+                        y2 = (i + 1) * piece_h
+                        x1 = j * piece_w
+                        x2 = (j + 1) * piece_w
+
+                        # Random displacement based on progress
+                        if progress < 1:
+                            dx = int(np.random.normal(0, 50 * (1-progress)))
+                            dy = int(np.random.normal(0, 50 * (1-progress)))
+
+                            # Ensure we stay within bounds
+                            y1_new = max(0, min(h-piece_h, y1 + dy))
+                            x1_new = max(0, min(w-piece_w, x1 + dx))
+                            y2_new = y1_new + piece_h
+                            x2_new = x1_new + piece_w
+
+                            shattered[y1_new:y2_new, x1_new:x2_new] = frame[y1:y2, x1:x2]
+                        else:
+                            shattered[y1:y2, x1:x2] = frame[y1:y2, x1:x2]
+
+                return shattered.astype(np.uint8)
+
+            return create_clip_with_audio(clip, make_frame)
+
+        elif internal_type == 'fade':
             if internal_position == 'start':
                 return clip.fx(vfx.fadein, duration)
             else:
@@ -396,137 +529,6 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
             new_clip.fps = clip.fps
             return new_clip
 
-        # New transition effects start here
-        elif internal_type == 'ripple':
-            def make_frame(t):
-                frame = clip.get_frame(t)
-                h, w = frame.shape[:2]
-
-                if internal_position == 'start':
-                    progress = min(1, t / duration) if t < duration else 1
-                else:
-                    progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
-
-                center = (w//2, h//2)
-                max_radius = np.sqrt(w**2 + h**2)
-                radius = int(max_radius * progress)
-
-                # Create ripple effect
-                y, x = np.ogrid[:h, :w]
-                dist = np.sqrt((x - center[0])**2 + (y - center[1])**2)
-                ripple = np.sin(dist/10 - radius/10) * progress
-                ripple = np.dstack([ripple, ripple, ripple])
-
-                return cv2.addWeighted(frame, 1-progress, (frame * (1 + ripple)).clip(0, 255).astype(np.uint8), progress, 0)
-
-            return create_clip_with_audio(clip, make_frame)
-
-        elif internal_type == 'spiral':
-            def make_frame(t):
-                frame = clip.get_frame(t)
-                h, w = frame.shape[:2]
-
-                if internal_position == 'start':
-                    progress = min(1, t / duration) if t < duration else 1
-                else:
-                    progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
-
-                center = (w//2, h//2)
-                y, x = np.ogrid[:h, :w]
-                dist = np.sqrt((x - center[0])**2 + (y - center[1])**2)
-                angle = np.arctan2(y - center[1], x - center[0])
-                mask = (angle + dist/10) < (progress * 20)
-                mask = mask.astype(np.float32)
-                mask = np.dstack([mask, mask, mask])
-
-                return (frame * mask).astype(np.uint8)
-
-            return create_clip_with_audio(clip, make_frame)
-
-        elif internal_type == 'matrix':
-            def make_frame(t):
-                frame = clip.get_frame(t)
-                h, w = frame.shape[:2]
-
-                if internal_position == 'start':
-                    progress = min(1, t / duration) if t < duration else 1
-                else:
-                    progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
-
-                # Create digital rain effect
-                matrix = np.random.rand(h, w) < (progress * 0.3)
-                rain = np.roll(matrix, int(progress * h//2), axis=0)
-                rain = np.dstack([rain * 0.1, rain * 0.8, rain * 0.3])  # Green tint
-
-                return cv2.addWeighted(frame, progress, (rain * 255).astype(np.uint8), 1-progress, 0)
-
-            return create_clip_with_audio(clip, make_frame)
-
-        elif internal_type == 'heart':
-            def make_frame(t):
-                frame = clip.get_frame(t)
-                h, w = frame.shape[:2]
-
-                if internal_position == 'start':
-                    progress = min(1, t / duration) if t < duration else 1
-                else:
-                    progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
-
-                # Create heart shape mask
-                center = (w//2, h//2)
-                size = int(min(w, h) * progress)
-                mask = np.zeros((h, w))
-                y, x = np.ogrid[:h, :w]
-                # Heart shape equation
-                inside_heart = ((x - center[0])**2 + (y - center[1])**2 - size**2)**3 - (x - center[0])**2 * (y - center[1])**3 < 0
-                mask[inside_heart] = 1
-                mask = np.dstack([mask, mask, mask])
-
-                return (frame * mask).astype(np.uint8)
-
-            return create_clip_with_audio(clip, make_frame)
-
-        elif internal_type == 'shatter':
-            def make_frame(t):
-                frame = clip.get_frame(t)
-                h, w = frame.shape[:2]
-
-                if internal_position == 'start':
-                    progress = min(1, t / duration) if t < duration else 1
-                else:
-                    progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
-
-                # Create shatter effect
-                pieces = 20
-                piece_h = h // pieces
-                piece_w = w // pieces
-                shattered = np.zeros_like(frame)
-
-                for i in range(pieces):
-                    for j in range(pieces):
-                        y1 = i * piece_h
-                        y2 = (i + 1) * piece_h
-                        x1 = j * piece_w
-                        x2 = (j + 1) * piece_w
-
-                        # Random displacement based on progress
-                        if progress < 1:
-                            dx = int(np.random.normal(0, 50 * (1-progress)))
-                            dy = int(np.random.normal(0, 50 * (1-progress)))
-
-                            # Ensure we stay within bounds
-                            y1_new = max(0, min(h-piece_h, y1 + dy))
-                            x1_new = max(0, min(w-piece_w, x1 + dx))
-                            y2_new = y1_new + piece_h
-                            x2_new = x1_new + piece_w
-
-                            shattered[y1_new:y2_new, x1_new:x2_new] = frame[y1:y2, x1:x2]
-                        else:
-                            shattered[y1:y2, x1:x2] = frame[y1:y2, x1:x2]
-
-                return shattered.astype(np.uint8)
-
-            return create_clip_with_audio(clip, make_frame)
 
         # Keep all other existing transition effects unchanged
         return clip

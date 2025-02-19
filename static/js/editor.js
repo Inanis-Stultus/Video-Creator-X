@@ -162,13 +162,18 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <option value="none" ${!item.filter || item.filter === 'none' ? 'selected' : ''}>No Filter</option>
                                 <option value="grayscale" ${item.filter === 'grayscale' ? 'selected' : ''}>Black & White</option>
                                 <option value="sepia" ${item.filter === 'sepia' ? 'selected' : ''}>Sepia Tone</option>
-                                <option value="blur" ${item.filter === 'blur' ? 'selected' : ''}>Soft Blur</option>
+                                <option value="blur" ${item.filter === 'blur' ? 'selected' : ''}>Blur</option>
                                 <option value="sharpen" ${item.filter === 'sharpen' ? 'selected' : ''}>Sharpen</option>
-                                <option value="invert" ${item.filter === 'invert' ? 'selected' : ''}>Invert Colors</option>
                                 <option value="bright" ${item.filter === 'bright' ? 'selected' : ''}>Brighten</option>
                                 <option value="dark" ${item.filter === 'dark' ? 'selected' : ''}>Darken</option>
                                 <option value="contrast" ${item.filter === 'contrast' ? 'selected' : ''}>High Contrast</option>
-                                <option value="vignette" ${item.filter === 'vignette' ? 'selected' : ''}>Vignette</option>
+                                <option value="mirror" ${item.filter === 'mirror' ? 'selected' : ''}>Mirror</option>
+                                <option value="cartoon" ${item.filter === 'cartoon' ? 'selected' : ''}>Cartoon</option>
+                                <option value="oil_painting" ${item.filter === 'oil_painting' ? 'selected' : ''}>Oil Painting</option>
+                                <option value="rainbow" ${item.filter === 'rainbow' ? 'selected' : ''}>Rainbow</option>
+                                <option value="neon" ${item.filter === 'neon' ? 'selected' : ''}>Neon Glow</option>
+                                <option value="thermal" ${item.filter === 'thermal' ? 'selected' : ''}>Thermal Vision</option>
+                                <option value="pencil_sketch" ${item.filter === 'pencil_sketch' ? 'selected' : ''}>Pencil Sketch</option>
                             </select>
                         </div>
                         <div class="form-check mb-3">
