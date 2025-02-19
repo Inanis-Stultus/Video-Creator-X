@@ -376,11 +376,15 @@ function proceedToEditor() {
         localStorage.setItem('visualTimeline', JSON.stringify(timeline));
         console.log('Saved to localStorage:', localStorage.getItem('visualTimeline'));
 
-        // Redirect to the editor page
-        window.location.href = '/editor';
+        // Add a delay before redirecting and show success message
+        alert('Timeline processed successfully! Redirecting to editor...');
+        setTimeout(() => {
+            window.location.href = '/editor';
+        }, 2000); // 2 second delay to see console logs
+
     } catch (error) {
         console.error('Error processing timeline:', error);
-        alert('Error processing the visual timeline. Please ensure it follows the exact format shown in the prompt and try again.');
-        return;
+        // Show error in alert and don't redirect
+        alert('Error processing the visual timeline: ' + error.message + '\nPlease ensure it follows the exact format shown in the prompt and try again.');
     }
 }
