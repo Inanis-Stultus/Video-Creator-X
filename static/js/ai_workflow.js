@@ -182,24 +182,68 @@ function proceedToVisualContent() {
     document.getElementById('step3').style.display = 'none';
 
     // Generate AI prompt for visual content
-    const visualPrompt = `Based on the following script and audio duration of ${Math.ceil(audioDuration)} seconds, please provide a detailed visual storyboard:
+    const visualPrompt = `Based on the following script and audio duration of ${Math.ceil(audioDuration)} seconds, please provide a detailed visual storyboard that matches this exact format:
 
 Script:
 ${script}
 
-Please specify:
-1. What images/videos to use for each section
-2. Duration for each visual element
-3. Transitions between elements
-4. Any filters or effects to apply
-5. Text overlays if needed
+Required Format for Each Scene:
+{
+    "timestamp": "0:00",
+    "duration": 5,
+    "type": "image/video",
+    "description": "Describe what should be shown",
+    "source": "Where to source this (e.g., 'Upload product photo', 'Record testimonial', 'Stock footage of city')",
+    "startTransition": "one-of-available-transitions",
+    "endTransition": "one-of-available-transitions",
+    "filter": "one-of-available-filters"
+}
 
-Format your response as a timeline with:
-- Timestamp
-- Visual element description
-- Duration
-- Transitions
-- Effects/Filters`;
+Available Filters:
+- grayscale: Black and white effect
+- sepia: Warm brownish tone
+- blur: Gaussian blur effect
+- sharpen: Enhance image details
+- bright: Increase brightness
+- dark: Decrease brightness
+- contrast: Enhance contrast
+- mirror: Mirror the image
+- cartoon: Cartoon-like effect
+- oil_painting: Oil painting effect
+- rainbow: Add rainbow overlay
+- neon: Neon glow effect
+- thermal: Thermal camera effect
+- pencil_sketch: Pencil drawing effect
+
+Available Transitions:
+Start/End transitions:
+- fade-in/fade-out: Fade to/from black
+- dissolve-in/dissolve-out: Gradual pixelated appearance/disappearance
+- wipe-right/wipe-left: Wipe effect from right/left
+- slide-right/slide-left: Slide in/out from right/left
+- rotate-in/rotate-out: Rotate while appearing/disappearing
+- zoom-in/zoom-out: Scale up/down effect
+- blur-in/blur-out: Transition through blur
+- ripple-in/ripple-out: Ripple effect transition
+- spiral-in/spiral-out: Spiral pattern transition
+- matrix-in/matrix-out: Digital matrix effect
+- heart-in/heart-out: Heart-shaped transition
+- shatter-in/shatter-out: Breaking glass effect
+
+Please provide a complete timeline that covers the entire ${Math.ceil(audioDuration)} seconds of audio, with each scene following the exact format above. The program will use this format to automatically process the video.
+
+Example Scene:
+{
+    "timestamp": "0:00",
+    "duration": 5,
+    "type": "image",
+    "description": "Opening title card with company logo",
+    "source": "Upload company logo image",
+    "startTransition": "fade-in",
+    "endTransition": "dissolve-out",
+    "filter": "bright"
+}
+`;
 
     const step4Html = `
         <div id="step4" class="step-container mt-4">
