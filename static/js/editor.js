@@ -92,8 +92,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     file_data: data.file_data,
                     duration: 5,
                     keepAudio: true,
-                    startTransition: 'fade-in',
-                    endTransition: 'fade-out',
+                    startTransition: 'fade',
+                    endTransition: 'fade',
                     filter: 'none'
                 });
                 window.timelineManager.updateUI();
@@ -130,13 +130,18 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <label>Start Transition</label>
                                     <select class="form-control" onchange="window.timelineManager.updateTransition(${index}, this.value, 'start')">
                                         <option value="none">None</option>
-                                        <option value="fade-in" ${item.startTransition === 'fade-in' ? 'selected' : ''}>Fade In</option>
-                                        <option value="dissolve-in" ${item.startTransition === 'dissolve-in' ? 'selected' : ''}>Dissolve In</option>
-                                        <option value="wipe-right" ${item.startTransition === 'wipe-right' ? 'selected' : ''}>Wipe Right</option>
-                                        <option value="slide-right" ${item.startTransition === 'slide-right' ? 'selected' : ''}>Slide Right</option>
-                                        <option value="rotate-in" ${item.startTransition === 'rotate-in' ? 'selected' : ''}>Rotate In</option>
-                                        <option value="zoom-in" ${item.startTransition === 'zoom-in' ? 'selected' : ''}>Zoom In</option>
-                                        <option value="blur-in" ${item.startTransition === 'blur-in' ? 'selected' : ''}>Blur In</option>
+                                        <option value="fade" ${item.startTransition === 'fade' ? 'selected' : ''}>Fade</option>
+                                        <option value="dissolve" ${item.startTransition === 'dissolve' ? 'selected' : ''}>Dissolve</option>
+                                        <option value="wipe" ${item.startTransition === 'wipe' ? 'selected' : ''}>Wipe</option>
+                                        <option value="slide" ${item.startTransition === 'slide' ? 'selected' : ''}>Slide</option>
+                                        <option value="rotate" ${item.startTransition === 'rotate' ? 'selected' : ''}>Rotate</option>
+                                        <option value="zoom" ${item.startTransition === 'zoom' ? 'selected' : ''}>Zoom</option>
+                                        <option value="blur" ${item.startTransition === 'blur' ? 'selected' : ''}>Blur</option>
+                                        <option value="ripple" ${item.startTransition === 'ripple' ? 'selected' : ''}>Ripple</option>
+                                        <option value="spiral" ${item.startTransition === 'spiral' ? 'selected' : ''}>Spiral</option>
+                                        <option value="matrix" ${item.startTransition === 'matrix' ? 'selected' : ''}>Matrix</option>
+                                        <option value="heart" ${item.startTransition === 'heart' ? 'selected' : ''}>Heart</option>
+                                        <option value="shatter" ${item.startTransition === 'shatter' ? 'selected' : ''}>Shatter</option>
                                     </select>
                                 </div>
                             </div>
@@ -145,13 +150,18 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <label>End Transition</label>
                                     <select class="form-control" onchange="window.timelineManager.updateTransition(${index}, this.value, 'end')">
                                         <option value="none">None</option>
-                                        <option value="fade-out" ${item.endTransition === 'fade-out' ? 'selected' : ''}>Fade Out</option>
-                                        <option value="dissolve-out" ${item.endTransition === 'dissolve-out' ? 'selected' : ''}>Dissolve Out</option>
-                                        <option value="wipe-left" ${item.endTransition === 'wipe-left' ? 'selected' : ''}>Wipe Left</option>
-                                        <option value="slide-left" ${item.endTransition === 'slide-left' ? 'selected' : ''}>Slide Left</option>
-                                        <option value="rotate-out" ${item.endTransition === 'rotate-out' ? 'selected' : ''}>Rotate Out</option>
-                                        <option value="zoom-out" ${item.endTransition === 'zoom-out' ? 'selected' : ''}>Zoom Out</option>
-                                        <option value="blur-out" ${item.endTransition === 'blur-out' ? 'selected' : ''}>Blur Out</option>
+                                        <option value="fade" ${item.endTransition === 'fade' ? 'selected' : ''}>Fade</option>
+                                        <option value="dissolve" ${item.endTransition === 'dissolve' ? 'selected' : ''}>Dissolve</option>
+                                        <option value="wipe" ${item.endTransition === 'wipe' ? 'selected' : ''}>Wipe</option>
+                                        <option value="slide" ${item.endTransition === 'slide' ? 'selected' : ''}>Slide</option>
+                                        <option value="rotate" ${item.endTransition === 'rotate' ? 'selected' : ''}>Rotate</option>
+                                        <option value="zoom" ${item.endTransition === 'zoom' ? 'selected' : ''}>Zoom</option>
+                                        <option value="blur" ${item.endTransition === 'blur' ? 'selected' : ''}>Blur</option>
+                                        <option value="ripple" ${item.endTransition === 'ripple' ? 'selected' : ''}>Ripple</option>
+                                        <option value="spiral" ${item.endTransition === 'spiral' ? 'selected' : ''}>Spiral</option>
+                                        <option value="matrix" ${item.endTransition === 'matrix' ? 'selected' : ''}>Matrix</option>
+                                        <option value="heart" ${item.endTransition === 'heart' ? 'selected' : ''}>Heart</option>
+                                        <option value="shatter" ${item.endTransition === 'shatter' ? 'selected' : ''}>Shatter</option>
                                     </select>
                                 </div>
                             </div>
@@ -160,8 +170,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             <label>Filter Effect</label>
                             <select class="form-control" onchange="window.timelineManager.updateFilter(${index}, this.value)">
                                 <option value="none" ${!item.filter || item.filter === 'none' ? 'selected' : ''}>No Filter</option>
-                                <option value="grayscale" ${item.filter === 'grayscale' ? 'selected' : ''}>Black & White</option>
-                                <option value="sepia" ${item.filter === 'sepia' ? 'selected' : ''}>Sepia Tone</option>
+                                <option value="grayscale" ${item.filter === 'grayscale' ? 'selected' : ''}>Grayscale</option>
+                                <option value="sepia" ${item.filter === 'sepia' ? 'selected' : ''}>Sepia</option>
                                 <option value="blur" ${item.filter === 'blur' ? 'selected' : ''}>Blur</option>
                                 <option value="sharpen" ${item.filter === 'sharpen' ? 'selected' : ''}>Sharpen</option>
                                 <option value="bright" ${item.filter === 'bright' ? 'selected' : ''}>Brighten</option>
@@ -239,6 +249,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function showAlert(message, type) {
         const alertContainer = document.getElementById('alert-container');
+        if (!alertContainer) return;
+
         const alert = document.createElement('div');
         alert.className = `alert alert-${type} alert-dismissible fade show`;
         alert.innerHTML = `
@@ -295,7 +307,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            // Create a download link for the video
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
