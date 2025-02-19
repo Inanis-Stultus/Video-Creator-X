@@ -6,21 +6,56 @@ document.addEventListener('DOMContentLoaded', function() {
     const resolutionControls = document.getElementById('resolution-controls');
     const MAX_FILE_SIZE = 16 * 1024 * 1024; // 16MB
 
+    // Initialize timeline manager with AI-generated timeline
+    window.timelineManager = {
+        items: [],
+        aiTimeline: null,
+        currentAiIndex: 0,
+
+        init: function() {
+            const visualTimeline = localStorage.getItem('visualTimeline');
+            if (visualTimeline) {
+                try {
+                    // Parse the AI-generated timeline
+                    this.aiTimeline = JSON.parse(visualTimeline);
+                    // Sort by timestamp if available
+                    if (Array.isArray(this.aiTimeline)) {
+                        this.aiTimeline.sort((a, b) => {
+                            const timeA = a.timestamp.split(':').map(Number);
+                            const timeB = b.timestamp.split(':').map(Number);
+                            return (timeA[0] * 60 + timeA[1]) - (timeB[0] * 60 + timeB[1]);
+                        });
+                    }
+                } catch (error) {
+                    console.error('Error parsing visual timeline:', error);
+                    alert('Error loading the visual timeline. Please try generating it again.');
+                }
+            }
+        },
+
+        updateUI: function() {
+            document.dispatchEvent(new CustomEvent('timelineUpdated', { detail: { items: this.items } }));
+        },
+
+        calculateTotalDuration: function() {
+            return this.items.reduce((total, item) => total + parseFloat(item.duration || 0), 0);
+        },
+
+        getNextTimelineItem: function() {
+            if (!this.aiTimeline || this.currentAiIndex >= this.aiTimeline.length) {
+                return null;
+            }
+            return this.aiTimeline[this.currentAiIndex++];
+        }
+    };
+
+    // Initialize timeline manager
+    window.timelineManager.init();
+
     // Resolution controls visibility
     useCustomResolution.addEventListener('change', function() {
         resolutionControls.style.display = this.checked ? 'flex' : 'none';
     });
-
-    // Initialize timeline manager
-    window.timelineManager = {
-        items: [],
-        updateUI: function() {
-            document.dispatchEvent(new CustomEvent('timelineUpdated', { detail: { items: this.items } }));
-        },
-        calculateTotalDuration: function() {
-            return this.items.reduce((total, item) => total + parseFloat(item.duration || 0), 0);
-        }
-    };
 
     // File upload handling
     dropZone.addEventListener('dragover', (e) => {
@@ -87,15 +122,30 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const data = await response.json();
             if (data.success) {
-                window.timelineManager.items.push({
-                    filename: data.filename,
-                    file_data: data.file_data,
-                    duration: 5,
-                    keepAudio: true,
-                    startTransition: 'fade',
-                    endTransition: 'fade',
-                    filter: 'none'
-                });
+                // Get next timeline item from AI-generated timeline
+                const timelineItem = window.timelineManager.getNextTimelineItem();
+                if (timelineItem) {
+                    window.timelineManager.items.push({
+                        filename: data.filename,
+                        file_data: data.file_data,
+                        duration: parseFloat(timelineItem.duration) || 5,
+                        keepAudio: true,
+                        startTransition: timelineItem.startTransition || 'fade-in',
+                        endTransition: timelineItem.endTransition || 'fade-out',
+                        filter: timelineItem.filter || 'none'
+                    });
+                } else {
+                    // Fallback if no AI timeline item is available
+                    window.timelineManager.items.push({
+                        filename: data.filename,
+                        file_data: data.file_data,
+                        duration: 5,
+                        keepAudio: true,
+                        startTransition: 'fade-in',
+                        endTransition: 'fade-out',
+                        filter: 'none'
+                    });
+                }
                 window.timelineManager.updateUI();
                 showAlert(`File ${file.name} uploaded successfully`, 'success');
             } else {
@@ -119,79 +169,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="card bg-dark">
                     <div class="card-body">
                         <h5 class="card-title">${item.filename}</h5>
-                        <div class="form-group mb-3">
-                            <label>Duration (seconds)</label>
-                            <input type="number" class="form-control" value="${item.duration}" 
-                                onchange="window.timelineManager.updateDuration(${index}, this.value)" min="0.1" step="0.1">
+                        <div class="mb-3">
+                            <label class="form-label">Duration: ${item.duration}s</label>
                         </div>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group mb-3">
-                                    <label>Start Transition</label>
-                                    <select class="form-control" onchange="window.timelineManager.updateTransition(${index}, this.value, 'start')">
-                                        <option value="none">None</option>
-                                        <option value="fade" ${item.startTransition === 'fade' ? 'selected' : ''}>Fade</option>
-                                        <option value="dissolve" ${item.startTransition === 'dissolve' ? 'selected' : ''}>Dissolve</option>
-                                        <option value="wipe" ${item.startTransition === 'wipe' ? 'selected' : ''}>Wipe</option>
-                                        <option value="slide" ${item.startTransition === 'slide' ? 'selected' : ''}>Slide</option>
-                                        <option value="rotate" ${item.startTransition === 'rotate' ? 'selected' : ''}>Rotate</option>
-                                        <option value="zoom" ${item.startTransition === 'zoom' ? 'selected' : ''}>Zoom</option>
-                                        <option value="blur" ${item.startTransition === 'blur' ? 'selected' : ''}>Blur</option>
-                                        <option value="ripple" ${item.startTransition === 'ripple' ? 'selected' : ''}>Ripple</option>
-                                        <option value="spiral" ${item.startTransition === 'spiral' ? 'selected' : ''}>Spiral</option>
-                                        <option value="matrix" ${item.startTransition === 'matrix' ? 'selected' : ''}>Matrix</option>
-                                        <option value="heart" ${item.startTransition === 'heart' ? 'selected' : ''}>Heart</option>
-                                        <option value="shatter" ${item.startTransition === 'shatter' ? 'selected' : ''}>Shatter</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-group mb-3">
-                                    <label>End Transition</label>
-                                    <select class="form-control" onchange="window.timelineManager.updateTransition(${index}, this.value, 'end')">
-                                        <option value="none">None</option>
-                                        <option value="fade" ${item.endTransition === 'fade' ? 'selected' : ''}>Fade</option>
-                                        <option value="dissolve" ${item.endTransition === 'dissolve' ? 'selected' : ''}>Dissolve</option>
-                                        <option value="wipe" ${item.endTransition === 'wipe' ? 'selected' : ''}>Wipe</option>
-                                        <option value="slide" ${item.endTransition === 'slide' ? 'selected' : ''}>Slide</option>
-                                        <option value="rotate" ${item.endTransition === 'rotate' ? 'selected' : ''}>Rotate</option>
-                                        <option value="zoom" ${item.endTransition === 'zoom' ? 'selected' : ''}>Zoom</option>
-                                        <option value="blur" ${item.endTransition === 'blur' ? 'selected' : ''}>Blur</option>
-                                        <option value="ripple" ${item.endTransition === 'ripple' ? 'selected' : ''}>Ripple</option>
-                                        <option value="spiral" ${item.endTransition === 'spiral' ? 'selected' : ''}>Spiral</option>
-                                        <option value="matrix" ${item.endTransition === 'matrix' ? 'selected' : ''}>Matrix</option>
-                                        <option value="heart" ${item.endTransition === 'heart' ? 'selected' : ''}>Heart</option>
-                                        <option value="shatter" ${item.endTransition === 'shatter' ? 'selected' : ''}>Shatter</option>
-                                    </select>
-                                </div>
-                            </div>
+                        <div class="mb-3">
+                            <label class="form-label">Start Transition: ${item.startTransition}</label>
                         </div>
-                        <div class="form-group mb-3">
-                            <label>Filter Effect</label>
-                            <select class="form-control" onchange="window.timelineManager.updateFilter(${index}, this.value)">
-                                <option value="none" ${!item.filter || item.filter === 'none' ? 'selected' : ''}>No Filter</option>
-                                <option value="grayscale" ${item.filter === 'grayscale' ? 'selected' : ''}>Grayscale</option>
-                                <option value="sepia" ${item.filter === 'sepia' ? 'selected' : ''}>Sepia</option>
-                                <option value="blur" ${item.filter === 'blur' ? 'selected' : ''}>Blur</option>
-                                <option value="sharpen" ${item.filter === 'sharpen' ? 'selected' : ''}>Sharpen</option>
-                                <option value="bright" ${item.filter === 'bright' ? 'selected' : ''}>Brighten</option>
-                                <option value="dark" ${item.filter === 'dark' ? 'selected' : ''}>Darken</option>
-                                <option value="contrast" ${item.filter === 'contrast' ? 'selected' : ''}>High Contrast</option>
-                                <option value="mirror" ${item.filter === 'mirror' ? 'selected' : ''}>Mirror</option>
-                                <option value="cartoon" ${item.filter === 'cartoon' ? 'selected' : ''}>Cartoon</option>
-                                <option value="oil_painting" ${item.filter === 'oil_painting' ? 'selected' : ''}>Oil Painting</option>
-                                <option value="rainbow" ${item.filter === 'rainbow' ? 'selected' : ''}>Rainbow</option>
-                                <option value="neon" ${item.filter === 'neon' ? 'selected' : ''}>Neon Glow</option>
-                                <option value="thermal" ${item.filter === 'thermal' ? 'selected' : ''}>Thermal Vision</option>
-                                <option value="pencil_sketch" ${item.filter === 'pencil_sketch' ? 'selected' : ''}>Pencil Sketch</option>
-                            </select>
+                        <div class="mb-3">
+                            <label class="form-label">End Transition: ${item.endTransition}</label>
                         </div>
-                        <div class="form-check mb-3">
-                            <input type="checkbox" class="form-check-input" ${item.keepAudio ? 'checked' : ''}
-                                onchange="window.timelineManager.updateAudio(${index}, this.checked)">
-                            <label class="form-check-label">Keep Audio</label>
+                        <div class="mb-3">
+                            <label class="form-label">Filter: ${item.filter}</label>
                         </div>
-                        <button class="btn btn-danger btn-sm" onclick="window.timelineManager.removeItem(${index})">Remove</button>
                     </div>
                 </div>
             `;
@@ -200,39 +189,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         updateDurationDisplay();
     }
-
-    // Timeline management functions
-    window.timelineManager.updateDuration = function(index, value) {
-        const duration = parseFloat(value);
-        if (duration > 0) {
-            this.items[index].duration = duration;
-            this.updateUI();
-        }
-    };
-
-    window.timelineManager.updateTransition = function(index, value, type) {
-        if (type === 'start') {
-            this.items[index].startTransition = value;
-        } else {
-            this.items[index].endTransition = value;
-        }
-        this.updateUI();
-    };
-
-    window.timelineManager.updateFilter = function(index, value) {
-        this.items[index].filter = value;
-        this.updateUI();
-    };
-
-    window.timelineManager.updateAudio = function(index, checked) {
-        this.items[index].keepAudio = checked;
-        this.updateUI();
-    };
-
-    window.timelineManager.removeItem = function(index) {
-        this.items.splice(index, 1);
-        this.updateUI();
-    };
 
     function updateDurationDisplay() {
         const totalDuration = window.timelineManager.calculateTotalDuration();
