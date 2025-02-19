@@ -64,28 +64,46 @@ class Timeline {
         this.selectedItemIndex = index;
         const preview = document.getElementById('preview');
 
+        // Clean up any existing preview elements
+        const existingImg = preview.parentElement.querySelector('img.preview-image');
+        if (existingImg) existingImg.remove();
+
         try {
-            if (item.filename.match(/\.(jpg|jpeg|png)$/i)) {
+            if (item.filename.match(/\.(jpg|jpeg|png|gif)$/i)) {
                 // Handle image preview
                 preview.style.display = 'none';
                 const img = document.createElement('img');
-                img.src = `/download/${item.filename}`;
-                img.className = 'w-100';
+                img.src = URL.createObjectURL(new Blob([Uint8Array.from(atob(item.file_data), c => c.charCodeAt(0))]));
+                img.className = 'preview-image w-100';
                 preview.parentElement.insertBefore(img, preview);
+
+                // Remove image after duration
                 setTimeout(() => {
+                    URL.revokeObjectURL(img.src);
                     img.remove();
                     preview.style.display = 'block';
                 }, item.duration * 1000);
             } else {
-                // Handle video/gif preview
-                preview.src = `/download/${item.filename}`;
+                // Handle video preview
+                const videoBlob = new Blob([Uint8Array.from(atob(item.file_data), c => c.charCodeAt(0))], {type: 'video/mp4'});
+                preview.src = URL.createObjectURL(videoBlob);
+                preview.style.display = 'block';
                 preview.load();
-                preview.play().catch(error => {
-                    console.error('Preview playback failed:', error);
-                });
+                preview.play()
+                    .then(() => {
+                        // Cleanup after video ends
+                        preview.onended = () => {
+                            URL.revokeObjectURL(preview.src);
+                        };
+                    })
+                    .catch(error => {
+                        console.error('Preview playback failed:', error);
+                        URL.revokeObjectURL(preview.src);
+                    });
             }
         } catch (error) {
             console.error('Preview failed:', error);
+            preview.style.display = 'block';
         }
     }
 

@@ -80,34 +80,22 @@ def apply_filter(clip, filter_type):
                 return sepia_image
             return clip.fl_image(make_sepia)
         elif filter_type == 'blur':
-            return clip.fx(vfx.blur, radius=3.0)
+            def blur_frame(frame):
+                return cv2.GaussianBlur(frame, (15, 15), 0)
+            return clip.fl_image(blur_frame)
         elif filter_type == 'sharpen':
             def sharpen(frame):
                 kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
                 return cv2.filter2D(frame, -1, kernel)
             return clip.fl_image(sharpen)
-        elif filter_type == 'invert':
-            def invert(frame):
-                return 255 - frame
-            return clip.fl_image(invert)
         elif filter_type == 'bright':
             return clip.fx(vfx.colorx, factor=1.5)
         elif filter_type == 'dark':
             return clip.fx(vfx.colorx, factor=0.5)
         elif filter_type == 'contrast':
             return clip.fx(vfx.lum_contrast, contrast=50)
-        elif filter_type == 'vignette':
-            def add_vignette(frame):
-                rows, cols = frame.shape[:2]
-                # Generate vignette mask
-                kernel_x = cv2.getGaussianKernel(cols, cols/2)
-                kernel_y = cv2.getGaussianKernel(rows, rows/2)
-                kernel = kernel_y * kernel_x.T
-                mask = 255 * kernel / np.linalg.norm(kernel)
-                mask = np.repeat(mask[:, :, np.newaxis], 3, axis=2)
-                vignetted = frame * (mask/255)
-                return vignetted.astype(np.uint8)
-            return clip.fl_image(add_vignette)
+        elif filter_type == 'mirror':
+            return clip.fx(vfx.mirror_x)
         return clip
     except Exception as e:
         logger.error(f"Failed to apply filter {filter_type}: {str(e)}")
