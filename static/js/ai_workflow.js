@@ -313,9 +313,63 @@ function proceedToEditor() {
         return;
     }
 
-    // Save the visual timeline
-    localStorage.setItem('visualTimeline', visualResponse);
+    try {
+        // Try to parse the response as JSON
+        let timeline;
+        try {
+            timeline = JSON.parse(visualResponse);
+        } catch (e) {
+            // If direct parsing fails, try to extract JSON objects from the text
+            const jsonMatches = visualResponse.match(/\{[\s\S]*?\}/g);
+            if (!jsonMatches) {
+                throw new Error('Could not find valid JSON objects in the response');
+            }
+            timeline = jsonMatches.map(match => {
+                try {
+                    return JSON.parse(match);
+                } catch (err) {
+                    console.error('Failed to parse timeline item:', match);
+                    return null;
+                }
+            }).filter(item => item !== null);
 
-    // Redirect to the editor page
-    window.location.href = '/editor';
+            if (timeline.length === 0) {
+                throw new Error('No valid timeline items found');
+            }
+        }
+
+        // Validate the timeline structure
+        if (!Array.isArray(timeline)) {
+            timeline = [timeline]; // Convert single object to array
+        }
+
+        // Validate each timeline item
+        timeline = timeline.map(item => ({
+            timestamp: item.timestamp || "0:00",
+            duration: parseFloat(item.duration) || 5,
+            type: item.type || "image",
+            description: item.description || "",
+            source: item.source || "",
+            startTransition: item.startTransition || "fade-in",
+            endTransition: item.endTransition || "fade-out",
+            filter: item.filter || "none"
+        }));
+
+        // Sort timeline by timestamp
+        timeline.sort((a, b) => {
+            const timeA = a.timestamp.split(':').map(Number);
+            const timeB = b.timestamp.split(':').map(Number);
+            return (timeA[0] * 60 + timeA[1]) - (timeB[0] * 60 + timeB[1]);
+        });
+
+        // Save the validated and formatted timeline
+        localStorage.setItem('visualTimeline', JSON.stringify(timeline));
+
+        // Redirect to the editor page
+        window.location.href = '/editor';
+    } catch (error) {
+        console.error('Error processing timeline:', error);
+        alert('Error processing the visual timeline. Please ensure it follows the exact format shown in the prompt and try again.');
+        return;
+    }
 }
