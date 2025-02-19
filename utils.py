@@ -570,16 +570,26 @@ def process_video(timeline, output_path, target_resolution=None):
                 duration = float(item.get('duration', 5))
                 keep_audio = item.get('keepAudio', True)
 
-                if item['filename'].lower().endswith(('.png', '.jpg', '.jpeg')):
-                    clip = mp.ImageClip(temp_path, duration=duration)
-                elif item['filename'].lower().endswith('.gif'):
-                    clip = mp.VideoFileClip(temp_path).loop(duration=duration)
-                else:
-                    clip = mp.VideoFileClip(temp_path)
-                    if not keep_audio:
-                        clip = clip.without_audio()
+                try:
+                    if item['filename'].lower().endswith(('.png', '.jpg', '.jpeg')):
+                        clip = mp.ImageClip(temp_path, duration=duration)
+                    elif item['filename'].lower().endswith('.gif'):
+                        clip = mp.VideoFileClip(temp_path).loop(duration=duration)
+                    else:
+                        # Add error handling for video frame reading
+                        clip = mp.VideoFileClip(temp_path)
+                        # Verify clip can be read
+                        test_frame = clip.get_frame(0)
+                        if test_frame is None or len(test_frame.shape) != 3:
+                            raise ValueError(f"Invalid video frame in {item['filename']}")
+                        if not keep_audio:
+                            clip = clip.without_audio()
 
-                input_clips.append(clip)
+                    input_clips.append(clip)
+                    logger.info(f"Successfully loaded clip: {item['filename']}")
+                except Exception as e:
+                    logger.error(f"Failed to load clip {item['filename']}: {str(e)}")
+                    raise
 
             # Determine target resolution from loaded clips
             if target_resolution:
@@ -590,23 +600,28 @@ def process_video(timeline, output_path, target_resolution=None):
 
             # Process each clip
             for idx, (item, clip) in enumerate(zip(timeline, input_clips)):
-                # Resize clip to target resolution with proper centering
-                clip = resize_clip_maintain_aspect(clip, target_width, target_height)
+                try:
+                    # Resize clip to target resolution with proper centering
+                    clip = resize_clip_maintain_aspect(clip, target_width, target_height)
 
-                # Apply filters
-                if item.get('filter'):
-                    clip = apply_filter(clip, item['filter'])
+                    # Apply filters
+                    if item.get('filter'):
+                        clip = apply_filter(clip, item['filter'])
 
-                # Apply transitions
-                start_transition = item.get('startTransition', 'fade-in')
-                end_transition = item.get('endTransition', 'fade-out')
+                    # Apply transitions
+                    start_transition = item.get('startTransition', 'fade-in')
+                    end_transition = item.get('endTransition', 'fade-out')
 
-                if start_transition != 'none':
-                    clip = apply_transition(clip, start_transition, transition_duration, 'start')
-                if end_transition != 'none':
-                    clip = apply_transition(clip, end_transition, transition_duration, 'end')
+                    if start_transition != 'none':
+                        clip = apply_transition(clip, start_transition, transition_duration, 'start')
+                    if end_transition != 'none':
+                        clip = apply_transition(clip, end_transition, transition_duration, 'end')
 
-                clips.append(clip)
+                    clips.append(clip)
+                    logger.info(f"Successfully processed clip {idx + 1}/{len(timeline)}")
+                except Exception as e:
+                    logger.error(f"Failed to process clip {idx + 1}: {str(e)}")
+                    raise
 
             # Ensure clips don't overlap during transitions by calculating proper start times
             final_clips = []
