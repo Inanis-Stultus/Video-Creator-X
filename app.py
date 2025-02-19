@@ -104,6 +104,10 @@ def process():
 
         # Get background audio if provided
         background_audio = data.get('background_audio')
+        if background_audio:
+            logger.info("Background audio received in request")
+        else:
+            logger.info("No background audio in request")
 
         # Create temporary files for processing
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -124,6 +128,8 @@ def process():
                 # Create output file
                 with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as temp_output:
                     try:
+                        logger.info("Starting video processing with parameters: resolution=%s, background_audio=%s", 
+                                  target_resolution, "present" if background_audio else "absent")
                         # Process video with the processed timeline
                         process_video(processed_timeline, temp_output.name, target_resolution, background_audio)
 
@@ -135,6 +141,7 @@ def process():
                         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
                         output_filename = f'output_{timestamp}.mp4'
 
+                        logger.info("Video processing completed successfully")
                         # Create response
                         return send_file(
                             io.BytesIO(video_data),
@@ -142,19 +149,22 @@ def process():
                             as_attachment=True,
                             download_name=output_filename
                         )
+                    except Exception as e:
+                        logger.error(f"Error during video processing: {str(e)}", exc_info=True)
+                        raise
                     finally:
                         # Clean up output file
                         try:
                             os.unlink(temp_output.name)
-                        except:
-                            pass
+                        except Exception as e:
+                            logger.error(f"Failed to cleanup temp output file: {str(e)}")
 
             except Exception as e:
-                logger.error(f"Processing error in temp directory: {str(e)}")
+                logger.error(f"Processing error in temp directory: {str(e)}", exc_info=True)
                 raise
 
     except Exception as e:
-        logger.error(f"Processing error: {str(e)}")
+        logger.error(f"Processing error: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 @app.after_request
