@@ -544,7 +544,7 @@ def create_clip_with_audio(original_clip, make_frame_func):
         new_clip = new_clip.set_audio(original_clip.audio)
     return new_clip
 
-def process_video(timeline, output_path, target_resolution=None):
+def process_video(timeline, output_path, target_resolution=None, background_audio=None):
     """Process video clips according to timeline."""
     input_clips = []
     clips = []
@@ -554,6 +554,20 @@ def process_video(timeline, output_path, target_resolution=None):
     try:
         # Create temporary directory
         with tempfile.TemporaryDirectory() as temp_dir:
+            # Load background audio if provided
+            background_audio_clip = None
+            if background_audio:
+                try:
+                    # Decode base64 data and save to temporary file
+                    binary_data = base64.b64decode(background_audio)
+                    temp_audio_path = os.path.join(temp_dir, 'background_audio.mp3')
+                    with open(temp_audio_path, 'wb') as f:
+                        f.write(binary_data)
+                    background_audio_clip = mp.AudioFileClip(temp_audio_path)
+                    temp_files.append(temp_audio_path)
+                except Exception as e:
+                    logger.error(f"Failed to load background audio: {str(e)}")
+
             # Load all clips first
             for item in timeline:
                 file_data = item.get('file_data')
@@ -636,12 +650,38 @@ def process_video(timeline, output_path, target_resolution=None):
                 current_start += clip.duration
 
             final_clip = mp.CompositeVideoClip(final_clips, size=(target_width, target_height))
+
+            # Add background audio if provided
+            if background_audio_clip:
+                # Loop the background audio if it's shorter than the video
+                if background_audio_clip.duration < final_clip.duration:
+                    num_loops = int(np.ceil(final_clip.duration / background_audio_clip.duration))
+                    background_audio_clip = mp.concatenate_audioclips([background_audio_clip] * num_loops)
+                # Trim the audio if it's longer than the video
+                background_audio_clip = background_audio_clip.subclip(0, final_clip.duration)
+
+                # Combine video's original audio (if any) with background audio
+                if final_clip.audio is not None:
+                    final_audio = mp.CompositeAudioClip([
+                        background_audio_clip.volumex(0.5),  # Background audio at 50% volume
+                        final_clip.audio.volumex(1.0)  # Original audio at 100% volume
+                    ])
+                else:
+                    final_audio = background_audio_clip
+
+                final_clip = final_clip.set_audio(final_audio)
+
             final_clip.write_videofile(output_path, codec='libx264', audio_codec='aac', fps=24)
 
             # Cleanup clips to free memory
             for clip in input_clips + clips:
                 try:
                     clip.close()
+                except:
+                    pass
+            if background_audio_clip:
+                try:
+                    background_audio_clip.close()
                 except:
                     pass
             final_clip.close()

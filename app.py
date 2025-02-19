@@ -102,6 +102,9 @@ def process():
             height = int(data['resolution'].get('height', 1080))
             target_resolution = (width, height)
 
+        # Get background audio if provided
+        background_audio = data.get('background_audio')
+
         # Create temporary files for processing
         with tempfile.TemporaryDirectory() as temp_dir:
             try:
@@ -122,7 +125,7 @@ def process():
                 with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as temp_output:
                     try:
                         # Process video with the processed timeline
-                        process_video(processed_timeline, temp_output.name, target_resolution)
+                        process_video(processed_timeline, temp_output.name, target_resolution, background_audio)
 
                         # Read the processed video file
                         with open(temp_output.name, 'rb') as f:
