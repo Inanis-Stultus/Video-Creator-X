@@ -65,55 +65,53 @@ def resize_clip_maintain_aspect(clip, target_width, target_height):
 def apply_filter(clip, filter_type):
     """Apply video filter to clip."""
     try:
-        if filter_type == 'grayscale':
+        if filter_type == 'none':
+            return clip
+
+        elif filter_type == 'grayscale':
             return clip.fx(vfx.blackwhite)
+
+        elif filter_type == 'blur':
+            def blur_frame(frame):
+                return cv2.GaussianBlur(frame, (15, 15), 0)
+            return clip.fl_image(blur_frame)
+
+        elif filter_type == 'bright':
+            return clip.fx(vfx.colorx, factor=1.5)
+
+        elif filter_type == 'dark':
+            return clip.fx(vfx.colorx, factor=0.5)
+
+        elif filter_type == 'contrast':
+            return clip.fx(vfx.lum_contrast, contrast=50)
+
+        elif filter_type == 'mirror':
+            return clip.fx(vfx.mirror_x)
+
         elif filter_type == 'sepia':
             def make_sepia(frame):
-                frame_array = np.array(frame)
+                frame = frame.astype(float)
                 sepia_matrix = np.array([
                     [0.393, 0.769, 0.189],
                     [0.349, 0.686, 0.168],
                     [0.272, 0.534, 0.131]
                 ])
-                sepia_image = np.dot(frame_array[...,:3], sepia_matrix.T)
-                sepia_image = np.clip(sepia_image, 0, 255).astype(np.uint8)
-                return sepia_image
+                sepia_img = frame.dot(sepia_matrix.T)
+                np.clip(sepia_img, 0, 255, out=sepia_img)
+                return sepia_img.astype(np.uint8)
             return clip.fl_image(make_sepia)
-        elif filter_type == 'blur':
-            return clip.fx(vfx.blur, radius=3.0)
-        elif filter_type == 'sharpen':
-            def sharpen(frame):
-                kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
-                return cv2.filter2D(frame, -1, kernel)
-            return clip.fl_image(sharpen)
+
         elif filter_type == 'invert':
-            def invert(frame):
+            def invert_frame(frame):
                 return 255 - frame
-            return clip.fl_image(invert)
-        elif filter_type == 'bright':
-            return clip.fx(vfx.colorx, factor=1.5)
-        elif filter_type == 'dark':
-            return clip.fx(vfx.colorx, factor=0.5)
-        elif filter_type == 'contrast':
-            return clip.fx(vfx.lum_contrast, contrast=50)
-        elif filter_type == 'vignette':
-            def add_vignette(frame):
-                rows, cols = frame.shape[:2]
-                # Generate vignette mask
-                kernel_x = cv2.getGaussianKernel(cols, cols/2)
-                kernel_y = cv2.getGaussianKernel(rows, rows/2)
-                kernel = kernel_y * kernel_x.T
-                mask = 255 * kernel / np.linalg.norm(kernel)
-                mask = np.repeat(mask[:, :, np.newaxis], 3, axis=2)
-                vignetted = frame * (mask/255)
-                return vignetted.astype(np.uint8)
-            return clip.fl_image(add_vignette)
+            return clip.fl_image(invert_frame)
+
         return clip
     except Exception as e:
         logger.error(f"Failed to apply filter {filter_type}: {str(e)}")
         return clip
 
-def apply_transition(clip, transition_type='fade-in', duration=1.0, position='start'):
+def apply_transition(clip, transition_type='fade', duration=1.0, position='start'):
     """Apply transition effect to a clip at the start or end."""
     try:
         if transition_type == 'none':
@@ -123,186 +121,55 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
         original_pos = clip.pos if hasattr(clip, 'pos') else lambda t: ('center', 'center')
         clip_width, clip_height = clip.size
 
-        # Map UI transition names to internal names
-        transition_map = {
-            'fade-in': ('fade', 'start'),
-            'fade-out': ('fade', 'end'),
-            'dissolve-in': ('dissolve', 'start'),
-            'dissolve-out': ('dissolve', 'end'),
-            'wipe-right': ('wipe', 'start'),
-            'wipe-left': ('wipe', 'end'),
-            'slide-right': ('slide', 'start'),
-            'slide-left': ('slide', 'end'),
-            'rotate-in': ('rotate', 'start'),
-            'rotate-out': ('rotate', 'end'),
-            'zoom-in': ('zoom', 'start'),
-            'zoom-out': ('zoom', 'end'),
-            'blur-in': ('blur', 'start'),
-            'blur-out': ('blur', 'end')
-        }
-
-        internal_type, internal_position = transition_map.get(transition_type, (transition_type, position))
-
-        if internal_type == 'fade':
-            if internal_position == 'start':
+        if transition_type == 'fade':
+            if position == 'start':
                 return clip.fx(vfx.fadein, duration)
             else:
                 return clip.fx(vfx.fadeout, duration)
 
-        elif internal_type == 'dissolve':
-            # Fixed dissolve effect with proper audio handling
+        elif transition_type == 'dissolve':
             def make_frame(t):
                 frame = clip.get_frame(t)
-                h, w = frame.shape[:2]
-
-                if internal_position == 'start':
+                if position == 'start':
                     if t < duration:
-                        # Use fixed random seed for consistent pattern
-                        np.random.seed(42)
-                        mask = np.random.random((h, w))
-                        threshold = t / duration
-                        mask = mask < threshold
-                        mask = np.dstack([mask] * 3)
-                        return frame * mask
+                        alpha = t / duration
+                        return (frame * alpha).astype('uint8')
                     return frame
                 else:
                     remaining = clip.duration - t
                     if remaining < duration:
-                        np.random.seed(42)
-                        mask = np.random.random((h, w))
-                        threshold = remaining / duration
-                        mask = mask < threshold
-                        mask = np.dstack([mask] * 3)
-                        return frame * mask
+                        alpha = remaining / duration
+                        return (frame * alpha).astype('uint8')
                     return frame
+            return clip.fl(make_frame)
 
-            new_clip = mp.VideoClip(make_frame, duration=clip.duration)
-            new_clip.fps = clip.fps
-            # Preserve audio from original clip
-            if clip.audio is not None:
-                new_clip = new_clip.set_audio(clip.audio)
-            return new_clip
-
-        elif internal_type == 'slide':
-            # Fixed slide transition with independent start/end positions
-            def get_slide_position(t):
-                original_x, original_y = original_pos(t) if callable(original_pos) else original_pos
-                original_x = 0 if original_x == 'center' else original_x
-
-                if internal_position == 'start':
+        elif transition_type == 'slide':
+            def slide_pos(t):
+                if position == 'start':
                     if t < duration:
                         progress = t / duration
-                        # Start from right (screen width) and slide to center
-                        x_offset = clip_width * (1 - progress)
-                        return (x_offset, 'center')
+                        return (clip_width * (progress - 1), 'center')
                     return ('center', 'center')
                 else:
                     remaining = clip.duration - t
                     if remaining < duration:
                         progress = remaining / duration
-                        # Start at center and slide to left (-screen width)
-                        x_offset = -clip_width * (1 - progress)
-                        return (x_offset, 'center')
+                        return (clip_width * (1 - progress), 'center')
                     return ('center', 'center')
+            return clip.set_position(slide_pos)
 
-            return clip.set_position(get_slide_position)
-
-        elif internal_type == 'zoom':
-            # Fixed zoom transition with correct scaling
-            def get_zoom_scale(t):
-                if internal_position == 'start':
+        elif transition_type == 'zoom':
+            def zoom_scale(t):
+                if position == 'start':
                     if t < duration:
-                        # Start from 0.2 (small) and zoom to 1.0 (normal)
-                        progress = t / duration
-                        return 0.2 + (0.8 * progress)
-                    return 1.0
+                        return 1 + 2 * (1 - t/duration)
+                    return 1
                 else:
                     remaining = clip.duration - t
                     if remaining < duration:
-                        # Start from 1.0 (normal) and zoom to 0.2 (small)
-                        progress = remaining / duration
-                        return 1.0 - (0.8 * (1 - progress))
-                    return 1.0
-
-            return clip.fx(vfx.resize, lambda t: get_zoom_scale(t))
-
-        elif internal_type == 'wipe':
-            def make_frame(t):
-                frame = clip.get_frame(t)
-                h, w = frame.shape[:2]
-                mask = np.zeros((h, w))
-
-                if internal_position == 'start':
-                    if t < duration:
-                        edge = int(w * (t/duration))
-                        mask[:, :edge] = 1
-                    else:
-                        mask[:, :] = 1
-                else:
-                    remaining = clip.duration - t
-                    if remaining < duration:
-                        edge = int(w * (remaining/duration))
-                        mask[:, :edge] = 1
-                    else:
-                        mask[:, :] = 1
-
-                mask = np.dstack([mask] * 3)
-                return frame * mask
-
-            new_clip = mp.VideoClip(make_frame, duration=clip.duration)
-            new_clip.fps = clip.fps
-            return new_clip
-
-        elif internal_type == 'rotate':
-            def make_frame(t):
-                frame = clip.get_frame(t)
-                h, w = frame.shape[:2]
-                center = (w//2, h//2)
-
-                if internal_position == 'start':
-                    if t < duration:
-                        angle = 360 * (1 - t/duration)
-                        scale = t/duration
-                    else:
-                        angle = 0
-                        scale = 1
-                else:
-                    remaining = clip.duration - t
-                    if remaining < duration:
-                        angle = 360 * (1 - remaining/duration)
-                        scale = remaining/duration
-                    else:
-                        angle = 0
-                        scale = 1
-
-                if scale > 0:
-                    matrix = cv2.getRotationMatrix2D(center, angle, scale)
-                    rotated = cv2.warpAffine(frame, matrix, (w, h))
-                    return rotated
-                return np.zeros_like(frame)
-
-            new_clip = mp.VideoClip(make_frame, duration=clip.duration)
-            new_clip.fps = clip.fps
-            return new_clip
-
-        elif internal_type == 'blur':
-            def make_frame(t):
-                frame = clip.get_frame(t)
-                if internal_position == 'start':
-                    if t < duration:
-                        sigma = 20 * (1 - t/duration)
-                        return cv2.GaussianBlur(frame, (0,0), sigma)
-                    return frame
-                else:
-                    remaining = clip.duration - t
-                    if remaining < duration:
-                        sigma = 20 * (1 - remaining/duration)
-                        return cv2.GaussianBlur(frame, (0,0), sigma)
-                    return frame
-
-            new_clip = mp.VideoClip(make_frame, duration=clip.duration)
-            new_clip.fps = clip.fps
-            return new_clip
+                        return 1 + 2 * (1 - remaining/duration)
+                    return 1
+            return clip.fx(vfx.resize, zoom_scale)
 
         return clip
     except Exception as e:
