@@ -16,9 +16,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const visualTimeline = localStorage.getItem('visualTimeline');
             if (visualTimeline) {
                 try {
-                    // Parse the AI-generated timeline
                     this.aiTimeline = JSON.parse(visualTimeline);
-                    // Sort by timestamp if available
                     if (Array.isArray(this.aiTimeline)) {
                         this.aiTimeline.sort((a, b) => {
                             const timeA = a.timestamp.split(':').map(Number);
@@ -28,7 +26,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 } catch (error) {
                     console.error('Error parsing visual timeline:', error);
-                    alert('Error loading the visual timeline. Please try generating it again.');
                 }
             }
         },
@@ -129,7 +126,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         filename: data.filename,
                         file_data: data.file_data,
                         duration: parseFloat(timelineItem.duration) || 5,
-                        keepAudio: true,
+                        keepAudio: file.type.startsWith('video/'),
                         startTransition: timelineItem.startTransition || 'fade-in',
                         endTransition: timelineItem.endTransition || 'fade-out',
                         filter: timelineItem.filter || 'none'
@@ -140,7 +137,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         filename: data.filename,
                         file_data: data.file_data,
                         duration: 5,
-                        keepAudio: true,
+                        keepAudio: file.type.startsWith('video/'),
                         startTransition: 'fade-in',
                         endTransition: 'fade-out',
                         filter: 'none'
@@ -161,6 +158,7 @@ document.addEventListener('DOMContentLoaded', function() {
         timelineContainer.innerHTML = '';
 
         items.forEach((item, index) => {
+            const isVideo = item.filename.toLowerCase().endsWith('.mp4');
             const element = document.createElement('div');
             element.className = 'timeline-item';
             element.draggable = true;
@@ -171,16 +169,47 @@ document.addEventListener('DOMContentLoaded', function() {
                         <h5 class="card-title">${item.filename}</h5>
                         <div class="mb-3">
                             <label class="form-label">Duration: ${item.duration}s</label>
+                            <input type="number" class="form-control" value="${item.duration}" 
+                                onchange="updateDuration(${index}, this.value)" min="0.1" step="0.1">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Start Transition: ${item.startTransition}</label>
+                            <label class="form-label">Start Transition</label>
+                            <select class="form-control" onchange="updateStartTransition(${index}, this.value)">
+                                <option value="fade-in" ${item.startTransition === 'fade-in' ? 'selected' : ''}>Fade In</option>
+                                <option value="dissolve-in" ${item.startTransition === 'dissolve-in' ? 'selected' : ''}>Dissolve In</option>
+                                <option value="slide-right" ${item.startTransition === 'slide-right' ? 'selected' : ''}>Slide Right</option>
+                                <option value="zoom-in" ${item.startTransition === 'zoom-in' ? 'selected' : ''}>Zoom In</option>
+                                <option value="none" ${item.startTransition === 'none' ? 'selected' : ''}>None</option>
+                            </select>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">End Transition: ${item.endTransition}</label>
+                            <label class="form-label">End Transition</label>
+                            <select class="form-control" onchange="updateEndTransition(${index}, this.value)">
+                                <option value="fade-out" ${item.endTransition === 'fade-out' ? 'selected' : ''}>Fade Out</option>
+                                <option value="dissolve-out" ${item.endTransition === 'dissolve-out' ? 'selected' : ''}>Dissolve Out</option>
+                                <option value="slide-left" ${item.endTransition === 'slide-left' ? 'selected' : ''}>Slide Left</option>
+                                <option value="zoom-out" ${item.endTransition === 'zoom-out' ? 'selected' : ''}>Zoom Out</option>
+                                <option value="none" ${item.endTransition === 'none' ? 'selected' : ''}>None</option>
+                            </select>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Filter: ${item.filter}</label>
+                            <label class="form-label">Filter</label>
+                            <select class="form-control" onchange="updateFilter(${index}, this.value)">
+                                <option value="none" ${item.filter === 'none' ? 'selected' : ''}>None</option>
+                                <option value="grayscale" ${item.filter === 'grayscale' ? 'selected' : ''}>Grayscale</option>
+                                <option value="sepia" ${item.filter === 'sepia' ? 'selected' : ''}>Sepia</option>
+                                <option value="blur" ${item.filter === 'blur' ? 'selected' : ''}>Blur</option>
+                                <option value="sharpen" ${item.filter === 'sharpen' ? 'selected' : ''}>Sharpen</option>
+                            </select>
                         </div>
+                        ${isVideo ? `
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" ${item.keepAudio ? 'checked' : ''} 
+                                onchange="updateAudio(${index}, this.checked)">
+                            <label class="form-check-label">Keep Audio</label>
+                        </div>
+                        ` : ''}
+                        <button class="btn btn-danger btn-sm" onclick="removeItem(${index})">Remove</button>
                     </div>
                 </div>
             `;
@@ -190,32 +219,38 @@ document.addEventListener('DOMContentLoaded', function() {
         updateDurationDisplay();
     }
 
-    function updateDurationDisplay() {
-        const totalDuration = window.timelineManager.calculateTotalDuration();
-        const durationDisplay = document.createElement('div');
-        durationDisplay.className = 'text-muted mt-2 duration-display';
-        durationDisplay.textContent = `Total Duration: ${totalDuration.toFixed(1)}s`;
-
-        const existingDisplay = document.querySelector('.duration-display');
-        if (existingDisplay) {
-            existingDisplay.remove();
+    window.updateDuration = function(index, value) {
+        const duration = parseFloat(value);
+        if (duration > 0) {
+            window.timelineManager.items[index].duration = duration;
+            window.timelineManager.updateUI();
         }
-        document.getElementById('timeline').appendChild(durationDisplay);
-    }
+    };
 
-    function showAlert(message, type) {
-        const alertContainer = document.getElementById('alert-container');
-        if (!alertContainer) return;
+    window.updateStartTransition = function(index, value) {
+        window.timelineManager.items[index].startTransition = value;
+        window.timelineManager.updateUI();
+    };
 
-        const alert = document.createElement('div');
-        alert.className = `alert alert-${type} alert-dismissible fade show`;
-        alert.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        `;
-        alertContainer.appendChild(alert);
-        setTimeout(() => alert.remove(), 5000);
-    }
+    window.updateEndTransition = function(index, value) {
+        window.timelineManager.items[index].endTransition = value;
+        window.timelineManager.updateUI();
+    };
+
+    window.updateFilter = function(index, value) {
+        window.timelineManager.items[index].filter = value;
+        window.timelineManager.updateUI();
+    };
+
+    window.updateAudio = function(index, checked) {
+        window.timelineManager.items[index].keepAudio = checked;
+        window.timelineManager.updateUI();
+    };
+
+    window.removeItem = function(index) {
+        window.timelineManager.items.splice(index, 1);
+        window.timelineManager.updateUI();
+    };
 
     async function exportVideo() {
         if (window.timelineManager.items.length === 0) {
@@ -281,5 +316,32 @@ document.addEventListener('DOMContentLoaded', function() {
             exportBtn.disabled = false;
             exportBtn.innerHTML = 'Export Video';
         }
+    }
+
+    function updateDurationDisplay() {
+        const totalDuration = window.timelineManager.calculateTotalDuration();
+        const durationDisplay = document.createElement('div');
+        durationDisplay.className = 'text-muted mt-2 duration-display';
+        durationDisplay.textContent = `Total Duration: ${totalDuration.toFixed(1)}s`;
+
+        const existingDisplay = document.querySelector('.duration-display');
+        if (existingDisplay) {
+            existingDisplay.remove();
+        }
+        document.getElementById('timeline').appendChild(durationDisplay);
+    }
+
+    function showAlert(message, type) {
+        const alertContainer = document.getElementById('alert-container');
+        if (!alertContainer) return;
+
+        const alert = document.createElement('div');
+        alert.className = `alert alert-${type} alert-dismissible fade show`;
+        alert.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        alertContainer.appendChild(alert);
+        setTimeout(() => alert.remove(), 5000);
     }
 });
