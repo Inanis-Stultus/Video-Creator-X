@@ -543,110 +543,89 @@ def create_clip_with_audio(original_clip, make_frame_func):
 
 def process_video(timeline, output_path, target_resolution=None):
     """Process video clips according to timeline."""
-    input_clips = []
     clips = []
-    temp_files = []
-    transition_duration = 1.0
+    transition_duration = 1.0  # Default transition duration
 
     try:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Load clips and process them
-            for item in timeline:
-                file_data = item.get('file_data')
-                if not file_data:
-                    raise ValueError("No file data provided")
+        # Determine target resolution
+        if target_resolution:
+            target_width, target_height = target_resolution
+        else:
+            target_width, target_height = get_max_resolution(timeline)
+            logger.info(f"Using max resolution from media: {target_width}x{target_height}")
 
-                # Decode base64 data and save to temporary file
-                binary_data = base64.b64decode(file_data)
-                temp_path = os.path.join(temp_dir, item['filename'])
-                with open(temp_path, 'wb') as f:
-                    f.write(binary_data)
-                temp_files.append(temp_path)
+        # Process each item in timeline
+        for item in timeline:
+            filepath = item['filepath']
+            if not os.path.exists(filepath):
+                raise FileNotFoundError(f"File not found: {filepath}")
 
-                duration = float(item.get('duration', 5))
-                keep_audio = item.get('keepAudio', True)
+            duration = float(item.get('duration', 5))
+            keep_audio = item.get('keepAudio', True)  # Default to keeping audio
 
-                try:
-                    if item['filename'].lower().endswith(('.png', '.jpg', '.jpeg')):
-                        clip = mp.ImageClip(temp_path, duration=duration)
-                    elif item['filename'].lower().endswith('.gif'):
-                        clip = mp.VideoFileClip(temp_path).loop(duration=duration)
-                    else:
-                        clip = mp.VideoFileClip(temp_path)
-                        # Preserve audio based on keepAudio flag
-                        if not keep_audio and hasattr(clip, 'audio') and clip.audio is not None:
-                            clip = clip.without_audio()
+            try:
+                if filepath.lower().endswith(('.png', '.jpg', '.jpeg')):
+                    clip = mp.ImageClip(filepath, duration=duration)
+                elif filepath.lower().endswith('.gif'):
+                    clip = mp.VideoFileClip(filepath).loop(duration=duration)
+                else:
+                    clip = mp.VideoFileClip(filepath)
+                    # Only remove audio if keepAudio is explicitly False
+                    if not keep_audio and hasattr(clip, 'audio') and clip.audio is not None:
+                        clip = clip.without_audio()
+                        logger.info(f"Removed audio from clip: {filepath}")
+                    elif keep_audio and hasattr(clip, 'audio') and clip.audio is not None:
+                        logger.info(f"Keeping audio from clip: {filepath}")
 
-                    input_clips.append(clip)
-                    logger.info(f"Successfully loaded clip: {item['filename']}")
-                except Exception as e:
-                    logger.error(f"Failed to load clip {item['filename']}: {str(e)}")
-                    raise
+                # Resize clip to target resolution
+                clip = resize_clip_maintain_aspect(clip, target_width, target_height)
 
-            # Determine target resolution from loaded clips
-            if target_resolution:
-                target_width, target_height = target_resolution
-            else:
-                target_width, target_height = get_max_resolution(input_clips)
-                logger.info(f"Using max resolution from media: {target_width}x{target_height}")
+                # Apply transitions
+                start_transition = item.get('startTransition', 'fade')
+                end_transition = item.get('endTransition', 'fade')
 
-            # Process each clip
-            for idx, (item, clip) in enumerate(zip(timeline, input_clips)):
-                try:
-                    # Resize clip to target resolution with proper centering
-                    clip = resize_clip_maintain_aspect(clip, target_width, target_height)
+                if start_transition != 'none':
+                    clip = apply_transition(clip, start_transition, transition_duration, 'start')
+                if end_transition != 'none':
+                    clip = apply_transition(clip, end_transition, transition_duration, 'end')
 
-                    # Apply filters if any
-                    if item.get('filter'):
-                        clip = apply_filter(clip, item['filter'])
+                clips.append(clip)
+            except Exception as e:
+                logger.error(f"Failed to process clip {filepath}: {str(e)}")
+                raise
 
-                    # Apply transitions
-                    start_transition = item.get('startTransition', 'fade')
-                    end_transition = item.get('endTransition', 'fade')
+        # Compose final video
+        final_clips = []
+        current_start = 0
+        for clip in clips:
+            clip = clip.set_start(current_start)
+            final_clips.append(clip)
+            current_start += clip.duration
 
-                    if start_transition != 'none':
-                        clip = apply_transition(clip, start_transition, transition_duration, 'start')
-                    if end_transition != 'none':
-                        clip = apply_transition(clip, end_transition, transition_duration, 'end')
+        final_clip = mp.CompositeVideoClip(final_clips, size=(target_width, target_height))
 
-                    clips.append(clip)
-                    logger.info(f"Successfully processed clip {idx + 1}/{len(timeline)}")
-                except Exception as e:
-                    logger.error(f"Failed to process clip {idx + 1}: {str(e)}")
-                    raise
+        # Write video file with audio
+        final_clip.write_videofile(
+            output_path,
+            codec='libx264',
+            audio_codec='aac',
+            fps=24,
+            logger=logger
+        )
 
-            # Ensure clips don't overlap during transitions
-            final_clips = []
-            current_start = 0
-            for clip in clips:
-                # Set the start time for each clip
-                clip = clip.set_start(current_start)
-                final_clips.append(clip)
-                current_start += clip.duration
+        # Cleanup
+        for clip in clips:
+            try:
+                clip.close()
+            except:
+                pass
+        final_clip.close()
 
-            final_clip = mp.CompositeVideoClip(final_clips, size=(target_width, target_height))
-            final_clip.write_videofile(
-                output_path,
-                codec='libx264',
-                audio_codec='aac',
-                fps=24,
-                write_logfile=True,
-                logger=logger
-            )
-
-            # Cleanup clips to free memory
-            for clip in input_clips + clips:
-                try:
-                    clip.close()
-                except:
-                    pass
-            final_clip.close()
-
-            return True
+        return True
     except Exception as e:
         logger.error(f"Video processing failed: {str(e)}")
         # Cleanup on error
-        for clip in input_clips + clips:
+        for clip in clips:
             try:
                 clip.close()
             except:
