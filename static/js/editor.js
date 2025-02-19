@@ -175,21 +175,37 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="mb-3">
                             <label class="form-label">Start Transition</label>
                             <select class="form-control" onchange="updateStartTransition(${index}, this.value)">
+                                <option value="none" ${item.startTransition === 'none' ? 'selected' : ''}>None</option>
                                 <option value="fade-in" ${item.startTransition === 'fade-in' ? 'selected' : ''}>Fade In</option>
                                 <option value="dissolve-in" ${item.startTransition === 'dissolve-in' ? 'selected' : ''}>Dissolve In</option>
                                 <option value="slide-right" ${item.startTransition === 'slide-right' ? 'selected' : ''}>Slide Right</option>
                                 <option value="zoom-in" ${item.startTransition === 'zoom-in' ? 'selected' : ''}>Zoom In</option>
-                                <option value="none" ${item.startTransition === 'none' ? 'selected' : ''}>None</option>
+                                <option value="ripple-in" ${item.startTransition === 'ripple-in' ? 'selected' : ''}>Ripple In</option>
+                                <option value="spiral-in" ${item.startTransition === 'spiral-in' ? 'selected' : ''}>Spiral In</option>
+                                <option value="matrix-in" ${item.startTransition === 'matrix-in' ? 'selected' : ''}>Matrix In</option>
+                                <option value="heart-in" ${item.startTransition === 'heart-in' ? 'selected' : ''}>Heart In</option>
+                                <option value="shatter-in" ${item.startTransition === 'shatter-in' ? 'selected' : ''}>Shatter In</option>
+                                <option value="rotate-in" ${item.startTransition === 'rotate-in' ? 'selected' : ''}>Rotate In</option>
+                                <option value="blur-in" ${item.startTransition === 'blur-in' ? 'selected' : ''}>Blur In</option>
+                                <option value="wipe-right" ${item.startTransition === 'wipe-right' ? 'selected' : ''}>Wipe Right</option>
                             </select>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">End Transition</label>
                             <select class="form-control" onchange="updateEndTransition(${index}, this.value)">
+                                <option value="none" ${item.endTransition === 'none' ? 'selected' : ''}>None</option>
                                 <option value="fade-out" ${item.endTransition === 'fade-out' ? 'selected' : ''}>Fade Out</option>
                                 <option value="dissolve-out" ${item.endTransition === 'dissolve-out' ? 'selected' : ''}>Dissolve Out</option>
                                 <option value="slide-left" ${item.endTransition === 'slide-left' ? 'selected' : ''}>Slide Left</option>
                                 <option value="zoom-out" ${item.endTransition === 'zoom-out' ? 'selected' : ''}>Zoom Out</option>
-                                <option value="none" ${item.endTransition === 'none' ? 'selected' : ''}>None</option>
+                                <option value="ripple-out" ${item.endTransition === 'ripple-out' ? 'selected' : ''}>Ripple Out</option>
+                                <option value="spiral-out" ${item.endTransition === 'spiral-out' ? 'selected' : ''}>Spiral Out</option>
+                                <option value="matrix-out" ${item.endTransition === 'matrix-out' ? 'selected' : ''}>Matrix Out</option>
+                                <option value="heart-out" ${item.endTransition === 'heart-out' ? 'selected' : ''}>Heart Out</option>
+                                <option value="shatter-out" ${item.endTransition === 'shatter-out' ? 'selected' : ''}>Shatter Out</option>
+                                <option value="rotate-out" ${item.endTransition === 'rotate-out' ? 'selected' : ''}>Rotate Out</option>
+                                <option value="blur-out" ${item.endTransition === 'blur-out' ? 'selected' : ''}>Blur Out</option>
+                                <option value="wipe-left" ${item.endTransition === 'wipe-left' ? 'selected' : ''}>Wipe Left</option>
                             </select>
                         </div>
                         <div class="mb-3">
@@ -200,6 +216,16 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <option value="sepia" ${item.filter === 'sepia' ? 'selected' : ''}>Sepia</option>
                                 <option value="blur" ${item.filter === 'blur' ? 'selected' : ''}>Blur</option>
                                 <option value="sharpen" ${item.filter === 'sharpen' ? 'selected' : ''}>Sharpen</option>
+                                <option value="bright" ${item.filter === 'bright' ? 'selected' : ''}>Bright</option>
+                                <option value="dark" ${item.filter === 'dark' ? 'selected' : ''}>Dark</option>
+                                <option value="contrast" ${item.filter === 'contrast' ? 'selected' : ''}>Contrast</option>
+                                <option value="mirror" ${item.filter === 'mirror' ? 'selected' : ''}>Mirror</option>
+                                <option value="cartoon" ${item.filter === 'cartoon' ? 'selected' : ''}>Cartoon</option>
+                                <option value="oil_painting" ${item.filter === 'oil_painting' ? 'selected' : ''}>Oil Painting</option>
+                                <option value="rainbow" ${item.filter === 'rainbow' ? 'selected' : ''}>Rainbow</option>
+                                <option value="neon" ${item.filter === 'neon' ? 'selected' : ''}>Neon</option>
+                                <option value="thermal" ${item.filter === 'thermal' ? 'selected' : ''}>Thermal</option>
+                                <option value="pencil_sketch" ${item.filter === 'pencil_sketch' ? 'selected' : ''}>Pencil Sketch</option>
                             </select>
                         </div>
                         ${isVideo ? `
