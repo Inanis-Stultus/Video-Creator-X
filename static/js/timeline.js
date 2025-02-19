@@ -2,12 +2,11 @@ class Timeline {
     constructor() {
         this.items = [];
         this.selectedItemIndex = -1;
+        this.preview = document.getElementById('preview');
         this.isDragging = false;
         this.dragStartIndex = -1;
-        this.previewElement = document.getElementById('preview');
 
         this.initializeSortable();
-        this.initializePreview();
     }
 
     initializeSortable() {
@@ -45,14 +44,6 @@ class Timeline {
         });
     }
 
-    initializePreview() {
-        // Initialize preview functionality
-        this.previewElement = document.getElementById('preview');
-        this.previewOverlay = document.createElement('div');
-        this.previewOverlay.className = 'preview-overlay';
-        this.previewElement.parentElement.appendChild(this.previewOverlay);
-    }
-
     updateTimelineOrder() {
         const timelineContainer = document.getElementById('timeline');
         const newOrder = Array.from(timelineContainer.children)
@@ -71,74 +62,31 @@ class Timeline {
 
         const item = this.items[index];
         this.selectedItemIndex = index;
-
-        // Get the preview container
-        const previewContainer = document.getElementById('preview-container');
-        const previewElement = document.getElementById('preview');
+        const preview = document.getElementById('preview');
 
         try {
-            // Clean up any existing preview
-            while (previewContainer.firstChild) {
-                previewContainer.firstChild.remove();
-            }
-
-            // Create new preview element based on file type
-            let mediaElement;
-            const isImage = item.filename.match(/\.(jpg|jpeg|png|gif)$/i);
-
-            if (isImage) {
-                mediaElement = document.createElement('img');
-                mediaElement.className = 'preview-media';
-                mediaElement.src = URL.createObjectURL(this.base64ToBlob(item.file_data, item.mime_type));
+            if (item.filename.match(/\.(jpg|jpeg|png)$/i)) {
+                // Handle image preview
+                preview.style.display = 'none';
+                const img = document.createElement('img');
+                img.src = `/download/${item.filename}`;
+                img.className = 'w-100';
+                preview.parentElement.insertBefore(img, preview);
+                setTimeout(() => {
+                    img.remove();
+                    preview.style.display = 'block';
+                }, item.duration * 1000);
             } else {
-                mediaElement = document.createElement('video');
-                mediaElement.className = 'preview-media';
-                mediaElement.src = URL.createObjectURL(this.base64ToBlob(item.file_data, item.mime_type));
-                mediaElement.controls = true;
-                mediaElement.autoplay = true;
+                // Handle video/gif preview
+                preview.src = `/download/${item.filename}`;
+                preview.load();
+                preview.play().catch(error => {
+                    console.error('Preview playback failed:', error);
+                });
             }
-
-            // Add the media element to the container
-            previewContainer.appendChild(mediaElement);
-
-            // Clean up the object URL after the media loads
-            mediaElement.onload = () => URL.revokeObjectURL(mediaElement.src);
-            mediaElement.onerror = (error) => {
-                console.error('Preview failed:', error);
-                this.showPreviewError();
-            };
-
         } catch (error) {
             console.error('Preview failed:', error);
-            this.showPreviewError();
         }
-    }
-
-    base64ToBlob(base64, mimeType) {
-        const byteCharacters = atob(base64);
-        const byteArrays = [];
-
-        for (let offset = 0; offset < byteCharacters.length; offset += 512) {
-            const slice = byteCharacters.slice(offset, offset + 512);
-            const byteNumbers = new Array(slice.length);
-
-            for (let i = 0; i < slice.length; i++) {
-                byteNumbers[i] = slice.charCodeAt(i);
-            }
-
-            const byteArray = new Uint8Array(byteNumbers);
-            byteArrays.push(byteArray);
-        }
-
-        return new Blob(byteArrays, { type: mimeType });
-    }
-
-    showPreviewError() {
-        const previewContainer = document.getElementById('preview-container');
-        const errorMessage = document.createElement('div');
-        errorMessage.className = 'preview-error';
-        errorMessage.textContent = 'Preview failed to load';
-        previewContainer.appendChild(errorMessage);
     }
 
     calculateTotalDuration() {
@@ -170,11 +118,10 @@ class Timeline {
                                     <label>Start Transition</label>
                                     <select class="form-control" 
                                         onchange="window.timelineManager.updateTransition(${index}, this.value, 'start')">
-                                        <option value="none">None</option>
                                         <option value="fade" ${item.startTransition === 'fade' ? 'selected' : ''}>Fade</option>
-                                        <option value="dissolve" ${item.startTransition === 'dissolve' ? 'selected' : ''}>Dissolve</option>
                                         <option value="slide" ${item.startTransition === 'slide' ? 'selected' : ''}>Slide</option>
                                         <option value="zoom" ${item.startTransition === 'zoom' ? 'selected' : ''}>Zoom</option>
+                                        <option value="none" ${item.startTransition === 'none' ? 'selected' : ''}>None</option>
                                     </select>
                                 </div>
                             </div>
@@ -183,37 +130,19 @@ class Timeline {
                                     <label>End Transition</label>
                                     <select class="form-control" 
                                         onchange="window.timelineManager.updateTransition(${index}, this.value, 'end')">
-                                        <option value="none">None</option>
                                         <option value="fade" ${item.endTransition === 'fade' ? 'selected' : ''}>Fade</option>
-                                        <option value="dissolve" ${item.endTransition === 'dissolve' ? 'selected' : ''}>Dissolve</option>
                                         <option value="slide" ${item.endTransition === 'slide' ? 'selected' : ''}>Slide</option>
                                         <option value="zoom" ${item.endTransition === 'zoom' ? 'selected' : ''}>Zoom</option>
+                                        <option value="none" ${item.endTransition === 'none' ? 'selected' : ''}>None</option>
                                     </select>
                                 </div>
                             </div>
-                        </div>
-                        <div class="form-group mb-3">
-                            <label>Filter</label>
-                            <select class="form-control" 
-                                onchange="window.timelineManager.updateFilter(${index}, this.value)">
-                                <option value="none">None</option>
-                                <option value="grayscale" ${item.filter === 'grayscale' ? 'selected' : ''}>Grayscale</option>
-                                <option value="sepia" ${item.filter === 'sepia' ? 'selected' : ''}>Sepia</option>
-                                <option value="blur" ${item.filter === 'blur' ? 'selected' : ''}>Blur</option>
-                                <option value="bright" ${item.filter === 'bright' ? 'selected' : ''}>Bright</option>
-                                <option value="dark" ${item.filter === 'dark' ? 'selected' : ''}>Dark</option>
-                                <option value="contrast" ${item.filter === 'contrast' ? 'selected' : ''}>High Contrast</option>
-                                <option value="mirror" ${item.filter === 'mirror' ? 'selected' : ''}>Mirror</option>
-                                <option value="invert" ${item.filter === 'invert' ? 'selected' : ''}>Invert</option>
-                            </select>
                         </div>
                         <div class="form-check mb-3">
                             <input type="checkbox" class="form-check-input" ${item.keepAudio ? 'checked' : ''}
                                 onchange="window.timelineManager.updateAudio(${index}, this.checked)">
                             <label class="form-check-label">Keep Audio</label>
                         </div>
-                        <button class="btn btn-primary btn-sm me-2" 
-                            onclick="window.timelineManager.previewItem(${index})">Preview</button>
                         <button class="btn btn-danger btn-sm" 
                             onclick="window.timelineManager.removeItem(${index})">Remove</button>
                     </div>
@@ -235,11 +164,6 @@ class Timeline {
 
     updateAudio(index, value) {
         this.items[index].keepAudio = value;
-        this.updateUI();
-    }
-
-    updateFilter(index, value) {
-        this.items[index].filter = value;
         this.updateUI();
     }
 
