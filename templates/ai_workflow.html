@@ -1,0 +1,73 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card bg-dark">
+                <div class="card-body">
+                    <h2 class="card-title mb-4">AI-Assisted Video Creation</h2>
+                    
+                    <!-- Step 1: Initial Input -->
+                    <div id="step1" class="step-container">
+                        <h3 class="mb-3">Step 1: Video Details</h3>
+                        <form id="videoDetailsForm">
+                            <div class="mb-3">
+                                <label for="videoTitle" class="form-label">Video Title</label>
+                                <input type="text" class="form-control" id="videoTitle" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="videoCategory" class="form-label">Video Category</label>
+                                <select class="form-control" id="videoCategory" required>
+                                    <option value="">Select a category</option>
+                                    <option value="educational">Educational</option>
+                                    <option value="entertainment">Entertainment</option>
+                                    <option value="tutorial">Tutorial</option>
+                                    <option value="marketing">Marketing</option>
+                                    <option value="social">Social Media</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="videoObjective" class="form-label">Video Objective</label>
+                                <textarea class="form-control" id="videoObjective" rows="3" placeholder="Describe what you want to achieve with this video" required></textarea>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="objectiveCategory" class="form-label">Objective Category</label>
+                                <select class="form-control" id="objectiveCategory" required>
+                                    <option value="">Select a category</option>
+                                    <option value="inform">Inform/Educate</option>
+                                    <option value="entertain">Entertain</option>
+                                    <option value="persuade">Persuade/Convince</option>
+                                    <option value="inspire">Inspire/Motivate</option>
+                                    <option value="promote">Promote/Market</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary">Continue to Script Generation</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Step 2-4 will be added dynamically via JavaScript -->
+                </div>
+            </div>
+
+            <!-- Navigation buttons -->
+            <div class="mt-3 d-flex justify-content-between">
+                <a href="{{ url_for('editor') }}" class="btn btn-outline-secondary">Switch to Manual Editor</a>
+                <a href="{{ url_for('home') }}" class="btn btn-outline-primary">Start Over</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/ai_workflow.js') }}"></script>
+{% endblock %}

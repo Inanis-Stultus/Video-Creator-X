@@ -1,0 +1,34 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 text-center">
+            <h1 class="mb-4">Video Editor</h1>
+            <p class="lead mb-5">Choose your preferred editing workflow</p>
+            
+            <div class="row">
+                <div class="col-md-6 mb-4">
+                    <div class="card bg-dark h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">Manual Editor</h5>
+                            <p class="card-text">Create videos with complete control over timeline, transitions, and effects.</p>
+                            <a href="{{ url_for('editor') }}" class="btn btn-primary">Start Manual Editing</a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 mb-4">
+                    <div class="card bg-dark h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">AI-Assisted Editor</h5>
+                            <p class="card-text">Let AI help you create professional videos with guided workflow.</p>
+                            <a href="{{ url_for('ai_workflow') }}" class="btn btn-primary">Start AI-Assisted Editing</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

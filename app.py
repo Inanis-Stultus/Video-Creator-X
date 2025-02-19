@@ -25,8 +25,16 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 @app.route('/')
-def index():
+def home():
+    return render_template('home.html')
+
+@app.route('/editor')
+def editor():
     return render_template('editor.html')
+
+@app.route('/ai-workflow')
+def ai_workflow():
+    return render_template('ai_workflow.html')
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
