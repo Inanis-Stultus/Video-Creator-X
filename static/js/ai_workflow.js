@@ -314,13 +314,20 @@ function proceedToEditor() {
     }
 
     try {
+        // Debug: Log the input
+        console.log('Raw visual response:', visualResponse);
+
         // Try to parse the response as JSON
         let timeline;
         try {
             timeline = JSON.parse(visualResponse);
+            console.log('Direct JSON parse succeeded:', timeline);
         } catch (e) {
+            console.log('Direct JSON parse failed, trying to extract objects');
             // If direct parsing fails, try to extract JSON objects from the text
             const jsonMatches = visualResponse.match(/\{[\s\S]*?\}/g);
+            console.log('Found JSON matches:', jsonMatches);
+
             if (!jsonMatches) {
                 throw new Error('Could not find valid JSON objects in the response');
             }
@@ -336,6 +343,7 @@ function proceedToEditor() {
             if (timeline.length === 0) {
                 throw new Error('No valid timeline items found');
             }
+            console.log('Extracted timeline:', timeline);
         }
 
         // Validate the timeline structure
@@ -355,6 +363,8 @@ function proceedToEditor() {
             filter: item.filter || "none"
         }));
 
+        console.log('Final validated timeline:', timeline);
+
         // Sort timeline by timestamp
         timeline.sort((a, b) => {
             const timeA = a.timestamp.split(':').map(Number);
@@ -364,6 +374,7 @@ function proceedToEditor() {
 
         // Save the validated and formatted timeline
         localStorage.setItem('visualTimeline', JSON.stringify(timeline));
+        console.log('Saved to localStorage:', localStorage.getItem('visualTimeline'));
 
         // Redirect to the editor page
         window.location.href = '/editor';
