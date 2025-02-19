@@ -92,8 +92,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     file_data: data.file_data,
                     duration: 5,
                     keepAudio: true,
-                    startTransition: 'fade',
-                    endTransition: 'fade',
+                    startTransition: 'fade-in',
+                    endTransition: 'fade-out',
                     filter: 'none'
                 });
                 window.timelineManager.updateUI();
@@ -130,9 +130,13 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <label>Start Transition</label>
                                     <select class="form-control" onchange="window.timelineManager.updateTransition(${index}, this.value, 'start')">
                                         <option value="none">None</option>
-                                        <option value="fade" ${item.startTransition === 'fade' ? 'selected' : ''}>Fade</option>
-                                        <option value="slide" ${item.startTransition === 'slide' ? 'selected' : ''}>Slide</option>
-                                        <option value="zoom" ${item.startTransition === 'zoom' ? 'selected' : ''}>Zoom</option>
+                                        <option value="fade-in" ${item.startTransition === 'fade-in' ? 'selected' : ''}>Fade In</option>
+                                        <option value="dissolve-in" ${item.startTransition === 'dissolve-in' ? 'selected' : ''}>Dissolve In</option>
+                                        <option value="wipe-right" ${item.startTransition === 'wipe-right' ? 'selected' : ''}>Wipe Right</option>
+                                        <option value="slide-right" ${item.startTransition === 'slide-right' ? 'selected' : ''}>Slide Right</option>
+                                        <option value="rotate-in" ${item.startTransition === 'rotate-in' ? 'selected' : ''}>Rotate In</option>
+                                        <option value="zoom-in" ${item.startTransition === 'zoom-in' ? 'selected' : ''}>Zoom In</option>
+                                        <option value="blur-in" ${item.startTransition === 'blur-in' ? 'selected' : ''}>Blur In</option>
                                     </select>
                                 </div>
                             </div>
@@ -141,9 +145,13 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <label>End Transition</label>
                                     <select class="form-control" onchange="window.timelineManager.updateTransition(${index}, this.value, 'end')">
                                         <option value="none">None</option>
-                                        <option value="fade" ${item.endTransition === 'fade' ? 'selected' : ''}>Fade</option>
-                                        <option value="slide" ${item.endTransition === 'slide' ? 'selected' : ''}>Slide</option>
-                                        <option value="zoom" ${item.endTransition === 'zoom' ? 'selected' : ''}>Zoom</option>
+                                        <option value="fade-out" ${item.endTransition === 'fade-out' ? 'selected' : ''}>Fade Out</option>
+                                        <option value="dissolve-out" ${item.endTransition === 'dissolve-out' ? 'selected' : ''}>Dissolve Out</option>
+                                        <option value="wipe-left" ${item.endTransition === 'wipe-left' ? 'selected' : ''}>Wipe Left</option>
+                                        <option value="slide-left" ${item.endTransition === 'slide-left' ? 'selected' : ''}>Slide Left</option>
+                                        <option value="rotate-out" ${item.endTransition === 'rotate-out' ? 'selected' : ''}>Rotate Out</option>
+                                        <option value="zoom-out" ${item.endTransition === 'zoom-out' ? 'selected' : ''}>Zoom Out</option>
+                                        <option value="blur-out" ${item.endTransition === 'blur-out' ? 'selected' : ''}>Blur Out</option>
                                     </select>
                                 </div>
                             </div>
@@ -153,7 +161,19 @@ document.addEventListener('DOMContentLoaded', function() {
                             <select class="form-control" onchange="window.timelineManager.updateFilter(${index}, this.value)">
                                 <option value="none" ${!item.filter || item.filter === 'none' ? 'selected' : ''}>No Filter</option>
                                 <option value="grayscale" ${item.filter === 'grayscale' ? 'selected' : ''}>Black & White</option>
+                                <option value="sepia" ${item.filter === 'sepia' ? 'selected' : ''}>Sepia Tone</option>
+                                <option value="blur" ${item.filter === 'blur' ? 'selected' : ''}>Blur</option>
+                                <option value="sharpen" ${item.filter === 'sharpen' ? 'selected' : ''}>Sharpen</option>
+                                <option value="bright" ${item.filter === 'bright' ? 'selected' : ''}>Brighten</option>
+                                <option value="dark" ${item.filter === 'dark' ? 'selected' : ''}>Darken</option>
+                                <option value="contrast" ${item.filter === 'contrast' ? 'selected' : ''}>High Contrast</option>
                                 <option value="mirror" ${item.filter === 'mirror' ? 'selected' : ''}>Mirror</option>
+                                <option value="cartoon" ${item.filter === 'cartoon' ? 'selected' : ''}>Cartoon</option>
+                                <option value="oil_painting" ${item.filter === 'oil_painting' ? 'selected' : ''}>Oil Painting</option>
+                                <option value="rainbow" ${item.filter === 'rainbow' ? 'selected' : ''}>Rainbow</option>
+                                <option value="neon" ${item.filter === 'neon' ? 'selected' : ''}>Neon Glow</option>
+                                <option value="thermal" ${item.filter === 'thermal' ? 'selected' : ''}>Thermal Vision</option>
+                                <option value="pencil_sketch" ${item.filter === 'pencil_sketch' ? 'selected' : ''}>Pencil Sketch</option>
                             </select>
                         </div>
                         <div class="form-check mb-3">
