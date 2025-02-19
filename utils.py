@@ -204,45 +204,38 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
         if transition_type == 'none':
             return clip
 
-        # Store original position and size
+        # Store original position, size and audio
         original_pos = clip.pos if hasattr(clip, 'pos') else lambda t: ('center', 'center')
         clip_width, clip_height = clip.size
+        original_audio = clip.audio if hasattr(clip, 'audio') else None
 
-        # Map UI transition names to internal names
+        # For fade transitions, use moviepy's built-in effects which handle audio correctly
+        if transition_type in ['fade-in', 'fade-out']:
+            if position == 'start':
+                return clip.fadein(duration)
+            else:
+                return clip.fadeout(duration)
+
+        # For other transitions, ensure audio is preserved
+        result_clip = None
+
+        # Apply the transition effect
         transition_map = {
-            # Keep all existing transitions
-            'fade-in': ('fade', 'start'),
-            'fade-out': ('fade', 'end'),
-            'dissolve-in': ('dissolve', 'start'),
-            'dissolve-out': ('dissolve', 'end'),
-            'wipe-right': ('wipe', 'start'),
-            'wipe-left': ('wipe', 'end'),
-            'slide-right': ('slide', 'start'),
-            'slide-left': ('slide', 'end'),
-            'rotate-in': ('rotate', 'start'),
-            'rotate-out': ('rotate', 'end'),
-            'zoom-in': ('zoom', 'start'),
-            'zoom-out': ('zoom', 'end'),
-            'blur-in': ('blur', 'start'),
-            'blur-out': ('blur', 'end'),
-            # New transitions
-            'ripple-in': ('ripple', 'start'),
-            'ripple-out': ('ripple', 'end'),
-            'spiral-in': ('spiral', 'start'),
-            'spiral-out': ('spiral', 'end'),
-            'matrix-in': ('matrix', 'start'),
-            'matrix-out': ('matrix', 'end'),
-            'heart-in': ('heart', 'start'),
-            'heart-out': ('heart', 'end'),
-            'shatter-in': ('shatter', 'start'),
-            'shatter-out': ('shatter', 'end')
+            'dissolve': ('dissolve', position),
+            'wipe': ('wipe', position),
+            'slide': ('slide', position),
+            'rotate': ('rotate', position),
+            'zoom': ('zoom', position),
+            'blur': ('blur', position),
+            'ripple': ('ripple', position),
+            'spiral': ('spiral', position),
+            'matrix': ('matrix', position),
+            'heart': ('heart', position),
+            'shatter': ('shatter', position)
         }
 
         internal_type, internal_position = transition_map.get(transition_type, (transition_type, position))
 
-        # Keep all existing transition effects unchanged
-
-        # New transition effects start here
         if internal_type == 'ripple':
             def make_frame(t):
                 frame = clip.get_frame(t)
@@ -265,7 +258,7 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
 
                 return cv2.addWeighted(frame, 1-progress, (frame * (1 + ripple)).clip(0, 255).astype(np.uint8), progress, 0)
 
-            return create_clip_with_audio(clip, make_frame)
+            result_clip = create_clip_with_audio(clip, make_frame)
 
         elif internal_type == 'spiral':
             def make_frame(t):
@@ -287,7 +280,7 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
 
                 return (frame * mask).astype(np.uint8)
 
-            return create_clip_with_audio(clip, make_frame)
+            result_clip = create_clip_with_audio(clip, make_frame)
 
         elif internal_type == 'matrix':
             def make_frame(t):
@@ -306,7 +299,7 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
 
                 return cv2.addWeighted(frame, progress, (rain * 255).astype(np.uint8), 1-progress, 0)
 
-            return create_clip_with_audio(clip, make_frame)
+            result_clip = create_clip_with_audio(clip, make_frame)
 
         elif internal_type == 'heart':
             def make_frame(t):
@@ -330,7 +323,7 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
 
                 return (frame * mask).astype(np.uint8)
 
-            return create_clip_with_audio(clip, make_frame)
+            result_clip = create_clip_with_audio(clip, make_frame)
 
         elif internal_type == 'shatter':
             def make_frame(t):
@@ -372,13 +365,8 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
 
                 return shattered.astype(np.uint8)
 
-            return create_clip_with_audio(clip, make_frame)
+            result_clip = create_clip_with_audio(clip, make_frame)
 
-        elif internal_type == 'fade':
-            if internal_position == 'start':
-                return clip.fx(vfx.fadein, duration)
-            else:
-                return clip.fx(vfx.fadeout, duration)
         elif internal_type == 'dissolve':
             # Fixed dissolve effect with proper audio handling
             def make_frame(t):
@@ -406,12 +394,12 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
                         return frame * mask
                     return frame
 
-            new_clip = mp.VideoClip(make_frame, duration=clip.duration)
-            new_clip.fps = clip.fps
+            result_clip = mp.VideoClip(make_frame, duration=clip.duration)
+            result_clip.fps = clip.fps
             # Preserve audio from original clip
             if clip.audio is not None:
-                new_clip = new_clip.set_audio(clip.audio)
-            return new_clip
+                result_clip = result_clip.set_audio(clip.audio)
+
         elif internal_type == 'slide':
             # Fixed slide transition with independent start/end positions
             def get_slide_position(t):
@@ -434,7 +422,7 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
                         return (x_offset, 'center')
                     return ('center', 'center')
 
-            return clip.set_position(get_slide_position)
+            result_clip = clip.set_position(get_slide_position)
         elif internal_type == 'zoom':
             # Fixed zoom transition with correct scaling
             def get_zoom_scale(t):
@@ -452,7 +440,7 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
                         return 1.0 - (0.8 * (1 - progress))
                     return 1.0
 
-            return clip.fx(vfx.resize, lambda t: get_zoom_scale(t))
+            result_clip = clip.fx(vfx.resize, lambda t: get_zoom_scale(t))
         elif internal_type == 'wipe':
             def make_frame(t):
                 frame = clip.get_frame(t)
@@ -476,9 +464,9 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
                 mask = np.dstack([mask] * 3)
                 return frame * mask
 
-            new_clip = mp.VideoClip(make_frame, duration=clip.duration)
-            new_clip.fps = clip.fps
-            return new_clip
+            result_clip = mp.VideoClip(make_frame, duration=clip.duration)
+            result_clip.fps = clip.fps
+
         elif internal_type == 'rotate':
             def make_frame(t):
                 frame = clip.get_frame(t)
@@ -507,9 +495,9 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
                     return rotated
                 return np.zeros_like(frame)
 
-            new_clip = mp.VideoClip(make_frame, duration=clip.duration)
-            new_clip.fps = clip.fps
-            return new_clip
+            result_clip = mp.VideoClip(make_frame, duration=clip.duration)
+            result_clip.fps = clip.fps
+
         elif internal_type == 'blur':
             def make_frame(t):
                 frame = clip.get_frame(t)
@@ -525,36 +513,44 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
                         return cv2.GaussianBlur(frame, (0,0), sigma)
                     return frame
 
-            new_clip = mp.VideoClip(make_frame, duration=clip.duration)
-            new_clip.fps = clip.fps
-            return new_clip
+            result_clip = mp.VideoClip(make_frame, duration=clip.duration)
+            result_clip.fps = clip.fps
 
 
-        # Keep all other existing transition effects unchanged
-        return clip
+        # Ensure the resulting clip has the original audio
+        if result_clip is not None and original_audio is not None:
+            result_clip = result_clip.set_audio(original_audio)
+
+        return result_clip or clip
     except Exception as e:
         logger.error(f"Failed to apply transition: {str(e)}")
         return clip
 
 def create_clip_with_audio(original_clip, make_frame_func):
     """Helper function to create a new clip while preserving audio"""
-    new_clip = mp.VideoClip(make_frame_func, duration=original_clip.duration)
-    new_clip.fps = original_clip.fps
-    if original_clip.audio is not None:
-        new_clip = new_clip.set_audio(original_clip.audio)
-    return new_clip
+    try:
+        new_clip = mp.VideoClip(make_frame_func, duration=original_clip.duration)
+        new_clip.fps = original_clip.fps
+
+        # Ensure audio is properly preserved
+        if hasattr(original_clip, 'audio') and original_clip.audio is not None:
+            new_clip = new_clip.set_audio(original_clip.audio)
+
+        return new_clip
+    except Exception as e:
+        logger.error(f"Error in create_clip_with_audio: {str(e)}")
+        return original_clip  # Return original clip if audio preservation fails
 
 def process_video(timeline, output_path, target_resolution=None):
     """Process video clips according to timeline."""
     input_clips = []
     clips = []
-    temp_files = []  # Track temporary files for cleanup
-    transition_duration = 1.0  # Default transition duration
+    temp_files = []
+    transition_duration = 1.0
 
     try:
-        # Create temporary directory
         with tempfile.TemporaryDirectory() as temp_dir:
-            # Load all clips first
+            # Load clips and process them
             for item in timeline:
                 file_data = item.get('file_data')
                 if not file_data:
@@ -576,14 +572,11 @@ def process_video(timeline, output_path, target_resolution=None):
                     elif item['filename'].lower().endswith('.gif'):
                         clip = mp.VideoFileClip(temp_path).loop(duration=duration)
                     else:
-                        # Add error handling for video frame reading
                         clip = mp.VideoFileClip(temp_path)
-                        # Verify clip can be read
-                        test_frame = clip.get_frame(0)
-                        if test_frame is None or len(test_frame.shape) != 3:
-                            raise ValueError(f"Invalid video frame in {item['filename']}")
-                        if not keep_audio:
+                        if not keep_audio and hasattr(clip, 'audio'):
                             clip = clip.without_audio()
+                        elif keep_audio and not hasattr(clip, 'audio'):
+                            logger.warning(f"No audio found in clip: {item['filename']}")
 
                     input_clips.append(clip)
                     logger.info(f"Successfully loaded clip: {item['filename']}")
@@ -636,7 +629,14 @@ def process_video(timeline, output_path, target_resolution=None):
                 current_start += clip.duration
 
             final_clip = mp.CompositeVideoClip(final_clips, size=(target_width, target_height))
-            final_clip.write_videofile(output_path, codec='libx264', audio_codec='aac', fps=24)
+            final_clip.write_videofile(
+                output_path,
+                codec='libx264',
+                audio_codec='aac',
+                fps=24,
+                write_logfile=True,
+                logger=logger
+            )
 
             # Cleanup clips to free memory
             for clip in input_clips + clips:
