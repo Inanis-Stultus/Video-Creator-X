@@ -1,13 +1,12 @@
 import os
-import io
 import logging
 import base64
 import tempfile
-import numpy as np
 import moviepy.editor as mp
 from moviepy.video.fx import all as vfx
-from PIL import Image
 import cv2
+import numpy as np
+
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +31,12 @@ def get_max_resolution(clips):
             max_height = max(max_height, height)
 
     return max_width or 1920, max_height or 1080  # Default to 1080p if no valid media
+
+def calculate_progress(t, clip_duration, duration, position):
+    if position == 'start':
+        return min(1, t / duration)
+    else:
+        return max(0, (clip_duration - t) / duration)
 
 def resize_clip_maintain_aspect(clip, target_width, target_height):
     """Resize clip maintaining aspect ratio with padding if needed."""
@@ -101,55 +106,77 @@ def apply_filter(clip, filter_type):
         # New filters start here
         elif filter_type == 'cartoon':
             def cartoonize(frame):
-                # Convert to float and normalize
-                frame = frame.astype(np.float32) / 255.0
-                # Edge detection
-                edges = cv2.Canny(cv2.convertScaleAbs(frame), 100, 200)
-                edges = cv2.dilate(edges, None)
-                edges = edges.astype(np.float32) / 255.0
-                # Color quantization
-                frame = frame * 4
-                frame = frame.astype(np.uint8)
-                frame = frame * 64
-                # Combine edges with color quantization
-                frame = frame.astype(np.float32) / 255.0
-                cartoon = frame * (1 - edges[:,:,np.newaxis])
-                return (cartoon * 255).astype(np.uint8)
+                # Converte o frame para um array numpy
+                img = np.array(frame)
+
+                # Importa cv2 dentro da função
+                import cv2
+
+                # Converte para escala de cinza
+                gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+
+                # Reduz o blur para manter mais detalhes (de 7 para 3)
+                blurred = cv2.medianBlur(gray, 1)
+
+                # Ajusta o threshold para bordas mais nítidas
+                edges = cv2.adaptiveThreshold(blurred, 255,
+                                              cv2.ADAPTIVE_THRESH_MEAN_C,
+                                              cv2.THRESH_BINARY, 9, 9)
+
+                # Reduz menos as cores para manter detalhes (ajuste nos parâmetros do bilateral)
+                color = cv2.bilateralFilter(img, 7, 150, 150)
+
+                # Combina as bordas com as cores
+                cartoon = cv2.bitwise_and(color, color, mask=edges)
+
+                return cartoon
+
             return clip.fl_image(cartoonize)
 
+
         elif filter_type == 'oil_painting':
+
             def oil_paint(frame):
-                # Oil painting effect parameters
-                radius = 4
-                intensity_levels = 12
-                # Convert to float32
-                frame_f = frame.astype(np.float32)
-                # Calculate intensity
-                intensity = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
-                # Create output image
-                output = np.zeros_like(frame_f)
-                # Apply oil painting effect
-                for i in range(-radius, radius + 1):
-                    for j in range(-radius, radius + 1):
-                        if i*i + j*j <= radius*radius:
-                            shifted = np.roll(np.roll(frame_f, i, axis=0), j, axis=1)
-                            shifted_intensity = np.roll(np.roll(intensity, i, axis=0), j, axis=1)
-                            output += shifted * (shifted_intensity[:,:,np.newaxis] / 255.0)
-                output = output / ((2*radius+1)**2)
-                return output.astype(np.uint8)
+                # Convert from RGB (MoviePy) to BGR (OpenCV)
+                frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+
+                # Apply smoothing to simulate brush strokes
+                smoothed = cv2.medianBlur(frame_bgr, 7)
+
+                # Enhance contrast and brightness
+                enhanced = cv2.convertScaleAbs(smoothed, alpha=1.1, beta=10)  # Menos contraste para evitar exagero
+
+                # Convert to HSV to adjust saturation
+                hsv = cv2.cvtColor(enhanced, cv2.COLOR_BGR2HSV)
+                hsv[:, :, 1] = cv2.multiply(hsv[:, :, 1], 1.40)  # Aumenta saturação em 50%
+
+                # Convert back to RGB
+                frame_rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
+
+                return frame_rgb
+
             return clip.fl_image(oil_paint)
 
+
+        # Rainbow Filter
+
         elif filter_type == 'rainbow':
+
             def add_rainbow(frame):
+
                 height, width = frame.shape[:2]
-                # Create rainbow gradient
+
                 rainbow = np.zeros((height, width, 3), dtype=np.uint8)
+
                 for i in range(width):
-                    hue = (i / width * 180).astype(np.uint8)
-                    rainbow[:,i] = [hue, 255, 255]
+                    hue = int((i / width) * 180)
+
+                    rainbow[:, i] = [hue, 255, 255]
+
                 rainbow = cv2.cvtColor(rainbow, cv2.COLOR_HSV2RGB)
-                # Blend with original frame
+
                 return cv2.addWeighted(frame, 0.7, rainbow, 0.3, 0)
+
             return clip.fl_image(add_rainbow)
 
         elif filter_type == 'neon':
@@ -193,24 +220,147 @@ def apply_filter(clip, filter_type):
                 return cv2.cvtColor(sketch, cv2.COLOR_GRAY2RGB)
             return clip.fl_image(sketch_effect)
 
+        # New filters
+        elif filter_type == 'invert':
+            def invert(frame):
+                return cv2.bitwise_not(frame)
+
+            return clip.fl_image(invert)
+
+        elif filter_type == 'emboss':
+            def emboss(frame):
+                kernel = np.array([[-2, -1, 0], [-1, 1, 1], [0, 1, 2]])
+                embossed = cv2.filter2D(frame, -1, kernel)
+                return cv2.cvtColor(embossed, cv2.COLOR_BGR2RGB)
+
+            return clip.fl_image(emboss)
+
+
+        # Glitch Effect Filter
+
+        elif filter_type == 'glitch':
+
+            def glitch_effect(frame):
+
+                height, width, _ = frame.shape
+
+                shift = width // 10
+
+                frame[:, :shift] = np.flip(frame[:, :shift], axis=1)
+
+                frame[:, width - shift:] = np.flip(frame[:, width - shift:], axis=1)
+
+                return frame
+
+            return clip.fl_image(glitch_effect)
+
+
+        # Pixelate Filter
+
+        elif filter_type == 'pixelate':
+
+            def pixelate(frame):
+
+                height, width = frame.shape[:2]
+
+                small = cv2.resize(frame, (width // 10, height // 10), interpolation=cv2.INTER_LINEAR)
+
+                return cv2.resize(small, (width, height), interpolation=cv2.INTER_NEAREST)
+
+            return clip.fl_image(pixelate)
+
+        elif filter_type == 'edge_detect':
+            def edge_detect(frame):
+                gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+                edges = cv2.Canny(gray, 100, 200)
+                return cv2.cvtColor(edges, cv2.COLOR_GRAY2RGB)
+
+            return clip.fl_image(edge_detect)
+
+        elif filter_type == 'posterize':
+            def posterize(frame):
+                return cv2.convertScaleAbs(frame // 64 * 64)
+
+            return clip.fl_image(posterize)
+
+
+        # Solarize Filter
+
+        elif filter_type == 'solarize':
+
+            def solarize(frame):
+
+                # Converte para escala de cinza para análise de brilho
+
+                gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+
+                _, mask = cv2.threshold(gray, 128, 255, cv2.THRESH_BINARY)
+
+                # Inverte apenas as áreas brilhantes
+
+                inverted = cv2.bitwise_not(frame)
+
+                result = np.where(mask[..., None] == 255, inverted, frame)
+
+                return result
+
+            return clip.fl_image(solarize)
+
+        elif filter_type == 'vignette':
+            def vignette(frame):
+                rows, cols = frame.shape[:2]
+                kernel_x = cv2.getGaussianKernel(cols, 200)
+                kernel_y = cv2.getGaussianKernel(rows, 200)
+                kernel = kernel_y * kernel_x.T
+                mask = 255 * kernel / np.linalg.norm(kernel)
+                vignette = np.copy(frame)
+                for i in range(3):
+                    vignette[:, :, i] = vignette[:, :, i] * mask
+                return vignette.astype(np.uint8)
+
+            return clip.fl_image(vignette)
+
+        elif filter_type == 'halftone':
+            def halftone(frame):
+                gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+                _, binary = cv2.threshold(gray, 128, 255, cv2.THRESH_BINARY)
+                return cv2.cvtColor(binary, cv2.COLOR_GRAY2RGB)
+
+            return clip.fl_image(halftone)
+
+        elif filter_type == 'noise':
+            def add_noise(frame):
+                noise = np.random.normal(0, 25, frame.shape).astype(np.uint8)
+                noisy_frame = cv2.add(frame, noise)
+                return np.clip(noisy_frame, 0, 255)
+
+            return clip.fl_image(add_noise)
+
+        elif filter_type == 'color_shift':
+            def color_shift(frame):
+                b, g, r = cv2.split(frame)
+                shifted = cv2.merge((g, r, b))
+                return shifted
+
+            return clip.fl_image(color_shift)
+
         return clip
     except Exception as e:
         logger.error(f"Failed to apply filter {filter_type}: {str(e)}")
         return clip
-
 def apply_transition(clip, transition_type='fade-in', duration=1.0, position='start'):
     """Apply transition effect to a clip at the start or end."""
     try:
         if transition_type == 'none':
             return clip
 
-        # Store original position and size
+        # Armazena posição e tamanho original
         original_pos = clip.pos if hasattr(clip, 'pos') else lambda t: ('center', 'center')
         clip_width, clip_height = clip.size
 
-        # Map UI transition names to internal names
+        # Mapeamento dos nomes de transição (UI) para os nomes internos e posição
         transition_map = {
-            # Keep all existing transitions
+            # Transições existentes
             'fade-in': ('fade', 'start'),
             'fade-out': ('fade', 'end'),
             'dissolve-in': ('dissolve', 'start'),
@@ -225,7 +375,6 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
             'zoom-out': ('zoom', 'end'),
             'blur-in': ('blur', 'start'),
             'blur-out': ('blur', 'end'),
-            # New transitions
             'ripple-in': ('ripple', 'start'),
             'ripple-out': ('ripple', 'end'),
             'spiral-in': ('spiral', 'start'),
@@ -235,143 +384,92 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
             'heart-in': ('heart', 'start'),
             'heart-out': ('heart', 'end'),
             'shatter-in': ('shatter', 'start'),
-            'shatter-out': ('shatter', 'end')
+            'shatter-out': ('shatter', 'end'),
+            # Novas transições
+            'glitch-in': ('glitch', 'start'),
+            'glitch-out': ('glitch', 'end'),
+            'pixelate-in': ('pixelate', 'start'),
+            'pixelate-out': ('pixelate', 'end'),
+            'circle-wipe-in': ('circle-wipe', 'start'),
+            'circle-wipe-out': ('circle-wipe', 'end'),
+            'swirl-in': ('swirl', 'start'),
+            'swirl-out': ('swirl', 'end'),
+            'wave-in': ('wave', 'start'),
+            'wave-out': ('wave', 'end'),
+            'tile-in': ('tile', 'start'),
+            'tile-out': ('tile', 'end'),
+            'color-shift-in': ('color-shift', 'start'),
+            'color-shift-out': ('color-shift', 'end')
         }
 
         internal_type, internal_position = transition_map.get(transition_type, (transition_type, position))
 
-        # Keep all existing transition effects unchanged
-
-        # New transition effects start here
-        if internal_type == 'ripple':
+        # ---------------------------------------------------
+        # Transições já implementadas (fade, dissolve, wipe, slide, rotate, zoom, blur, matrix, heart, shatter)
+        # ---------------------------------------------------
+        if internal_type == 'matrix':
             def make_frame(t):
                 frame = clip.get_frame(t)
                 h, w = frame.shape[:2]
-
                 if internal_position == 'start':
                     progress = min(1, t / duration) if t < duration else 1
                 else:
                     progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
-
-                center = (w//2, h//2)
-                max_radius = np.sqrt(w**2 + h**2)
-                radius = int(max_radius * progress)
-
-                # Create ripple effect
-                y, x = np.ogrid[:h, :w]
-                dist = np.sqrt((x - center[0])**2 + (y - center[1])**2)
-                ripple = np.sin(dist/10 - radius/10) * progress
-                ripple = np.dstack([ripple, ripple, ripple])
-
-                return cv2.addWeighted(frame, 1-progress, (frame * (1 + ripple)).clip(0, 255).astype(np.uint8), progress, 0)
-
-            return create_clip_with_audio(clip, make_frame)
-
-        elif internal_type == 'spiral':
-            def make_frame(t):
-                frame = clip.get_frame(t)
-                h, w = frame.shape[:2]
-
-                if internal_position == 'start':
-                    progress = min(1, t / duration) if t < duration else 1
-                else:
-                    progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
-
-                center = (w//2, h//2)
-                y, x = np.ogrid[:h, :w]
-                dist = np.sqrt((x - center[0])**2 + (y - center[1])**2)
-                angle = np.arctan2(y - center[1], x - center[0])
-                mask = (angle + dist/10) < (progress * 20)
-                mask = mask.astype(np.float32)
-                mask = np.dstack([mask, mask, mask])
-
-                return (frame * mask).astype(np.uint8)
-
-            return create_clip_with_audio(clip, make_frame)
-
-        elif internal_type == 'matrix':
-            def make_frame(t):
-                frame = clip.get_frame(t)
-                h, w = frame.shape[:2]
-
-                if internal_position == 'start':
-                    progress = min(1, t / duration) if t < duration else 1
-                else:
-                    progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
-
-                # Create digital rain effect
+                # Efeito digital "Matrix"
                 matrix = np.random.rand(h, w) < (progress * 0.3)
-                rain = np.roll(matrix, int(progress * h//2), axis=0)
-                rain = np.dstack([rain * 0.1, rain * 0.8, rain * 0.3])  # Green tint
-
-                return cv2.addWeighted(frame, progress, (rain * 255).astype(np.uint8), 1-progress, 0)
-
+                rain = np.roll(matrix, int(progress * h // 2), axis=0)
+                rain = np.dstack([rain * 0.1, rain * 0.8, rain * 0.3])  # tonalidade verde
+                return cv2.addWeighted(frame, progress, (rain * 255).astype(np.uint8), 1 - progress, 0)
             return create_clip_with_audio(clip, make_frame)
 
         elif internal_type == 'heart':
             def make_frame(t):
                 frame = clip.get_frame(t)
                 h, w = frame.shape[:2]
-
                 if internal_position == 'start':
                     progress = min(1, t / duration) if t < duration else 1
                 else:
                     progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
-
-                # Create heart shape mask
-                center = (w//2, h//2)
+                center = (w // 2, h // 2)
                 size = int(min(w, h) * progress)
                 mask = np.zeros((h, w))
                 y, x = np.ogrid[:h, :w]
-                # Heart shape equation
-                inside_heart = ((x - center[0])**2 + (y - center[1])**2 - size**2)**3 - (x - center[0])**2 * (y - center[1])**3 < 0
+                # Equação para forma de coração
+                inside_heart = ((x - center[0]) ** 2 + (y - center[1]) ** 2 - size ** 2) ** 3 - (x - center[0]) ** 2 * (y - center[1]) ** 3 < 0
                 mask[inside_heart] = 1
                 mask = np.dstack([mask, mask, mask])
-
                 return (frame * mask).astype(np.uint8)
-
             return create_clip_with_audio(clip, make_frame)
 
         elif internal_type == 'shatter':
             def make_frame(t):
                 frame = clip.get_frame(t)
                 h, w = frame.shape[:2]
-
                 if internal_position == 'start':
                     progress = min(1, t / duration) if t < duration else 1
                 else:
                     progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
-
-                # Create shatter effect
                 pieces = 20
                 piece_h = h // pieces
                 piece_w = w // pieces
                 shattered = np.zeros_like(frame)
-
                 for i in range(pieces):
                     for j in range(pieces):
                         y1 = i * piece_h
                         y2 = (i + 1) * piece_h
                         x1 = j * piece_w
                         x2 = (j + 1) * piece_w
-
-                        # Random displacement based on progress
                         if progress < 1:
-                            dx = int(np.random.normal(0, 50 * (1-progress)))
-                            dy = int(np.random.normal(0, 50 * (1-progress)))
-
-                            # Ensure we stay within bounds
-                            y1_new = max(0, min(h-piece_h, y1 + dy))
-                            x1_new = max(0, min(w-piece_w, x1 + dx))
+                            dx = int(np.random.normal(0, 50 * (1 - progress)))
+                            dy = int(np.random.normal(0, 50 * (1 - progress)))
+                            y1_new = max(0, min(h - piece_h, y1 + dy))
+                            x1_new = max(0, min(w - piece_w, x1 + dx))
                             y2_new = y1_new + piece_h
                             x2_new = x1_new + piece_w
-
                             shattered[y1_new:y2_new, x1_new:x2_new] = frame[y1:y2, x1:x2]
                         else:
                             shattered[y1:y2, x1:x2] = frame[y1:y2, x1:x2]
-
                 return shattered.astype(np.uint8)
-
             return create_clip_with_audio(clip, make_frame)
 
         elif internal_type == 'fade':
@@ -379,15 +477,13 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
                 return clip.fx(vfx.fadein, duration)
             else:
                 return clip.fx(vfx.fadeout, duration)
+
         elif internal_type == 'dissolve':
-            # Fixed dissolve effect with proper audio handling
             def make_frame(t):
                 frame = clip.get_frame(t)
                 h, w = frame.shape[:2]
-
                 if internal_position == 'start':
                     if t < duration:
-                        # Use fixed random seed for consistent pattern
                         np.random.seed(42)
                         mask = np.random.random((h, w))
                         threshold = t / duration
@@ -405,136 +501,360 @@ def apply_transition(clip, transition_type='fade-in', duration=1.0, position='st
                         mask = np.dstack([mask] * 3)
                         return frame * mask
                     return frame
-
             new_clip = mp.VideoClip(make_frame, duration=clip.duration)
             new_clip.fps = clip.fps
-            # Preserve audio from original clip
             if clip.audio is not None:
                 new_clip = new_clip.set_audio(clip.audio)
             return new_clip
+
         elif internal_type == 'slide':
-            # Fixed slide transition with independent start/end positions
-            def get_slide_position(t):
-                original_x, original_y = original_pos(t) if callable(original_pos) else original_pos
-                original_x = 0 if original_x == 'center' else original_x
-
-                if internal_position == 'start':
-                    if t < duration:
-                        progress = t / duration
-                        # Start from right (screen width) and slide to center
-                        x_offset = clip_width * (1 - progress)
-                        return (x_offset, 'center')
-                    return ('center', 'center')
+            def get_combined_slide_position(t):
+                if callable(original_pos):
+                    original_x, original_y = original_pos(t)
                 else:
-                    remaining = clip.duration - t
+                    original_x, original_y = original_pos
+                if original_x == 'center':
+                    original_x = 0
+                if original_y == 'center':
+                    original_y = 0
+                x_offset = original_x
+                if internal_position == 'start' and 0 <= t < duration:
+                    progress = t / duration
+                    x_offset = -clip_width * (1 - progress)
+                elif internal_position == 'end':
+                    remaining = max(0, clip.duration - t)
                     if remaining < duration:
                         progress = remaining / duration
-                        # Start at center and slide to left (-screen width)
                         x_offset = -clip_width * (1 - progress)
-                        return (x_offset, 'center')
-                    return ('center', 'center')
+                return (x_offset, original_y)
+            return clip.set_position(get_combined_slide_position)
 
-            return clip.set_position(get_slide_position)
         elif internal_type == 'zoom':
-            # Fixed zoom transition with correct scaling
             def get_zoom_scale(t):
-                if internal_position == 'start':
+                if position == 'start':
                     if t < duration:
-                        # Start from 0.2 (small) and zoom to 1.0 (normal)
                         progress = t / duration
-                        return 0.2 + (0.8 * progress)
+                        scale = 0.1 + (0.9 * progress)
+                        return scale
                     return 1.0
                 else:
                     remaining = clip.duration - t
                     if remaining < duration:
-                        # Start from 1.0 (normal) and zoom to 0.2 (small)
                         progress = remaining / duration
-                        return 1.0 - (0.8 * (1 - progress))
+                        scale = 1.0 - (0.9 * (1 - progress))
+                        return scale
                     return 1.0
+            centered_clip = clip.set_position(('center', 'center'))
+            def make_zoomed_frame(t):
+                scale = get_zoom_scale(t)
+                new_width = int(clip_width * scale)
+                new_height = int(clip_height * scale)
+                frame = clip.get_frame(t)
+                resized_frame = cv2.resize(frame, (new_width, new_height), interpolation=cv2.INTER_AREA)
+                output_frame = np.zeros((clip_height, clip_width, 3), dtype=np.uint8)
+                y_offset = (clip_height - new_height) // 2
+                x_offset = (clip_width - new_width) // 2
+                output_frame[y_offset:y_offset + new_height, x_offset:x_offset + new_width] = resized_frame
+                return output_frame
+            zoomed_clip = mp.VideoClip(make_zoomed_frame, duration=clip.duration)
+            zoomed_clip.fps = clip.fps
+            if clip.audio is not None:
+                zoomed_clip = zoomed_clip.set_audio(clip.audio)
+            final_clip = zoomed_clip.set_position(('center', 'center'))
+            return final_clip
 
-            return clip.fx(vfx.resize, lambda t: get_zoom_scale(t))
         elif internal_type == 'wipe':
             def make_frame(t):
                 frame = clip.get_frame(t)
                 h, w = frame.shape[:2]
                 mask = np.zeros((h, w))
-
                 if internal_position == 'start':
                     if t < duration:
-                        edge = int(w * (t/duration))
+                        edge = int(w * (t / duration))
                         mask[:, :edge] = 1
                     else:
                         mask[:, :] = 1
                 else:
                     remaining = clip.duration - t
                     if remaining < duration:
-                        edge = int(w * (remaining/duration))
+                        edge = int(w * (remaining / duration))
                         mask[:, :edge] = 1
                     else:
                         mask[:, :] = 1
-
                 mask = np.dstack([mask] * 3)
                 return frame * mask
-
             new_clip = mp.VideoClip(make_frame, duration=clip.duration)
             new_clip.fps = clip.fps
+            if clip.audio is not None:
+                new_clip = new_clip.set_audio(clip.audio)
             return new_clip
+
         elif internal_type == 'rotate':
             def make_frame(t):
                 frame = clip.get_frame(t)
                 h, w = frame.shape[:2]
-                center = (w//2, h//2)
-
+                center = (w // 2, h // 2)
                 if internal_position == 'start':
                     if t < duration:
-                        angle = 360 * (1 - t/duration)
-                        scale = t/duration
+                        angle = 360 * (1 - t / duration)
+                        scale = t / duration
                     else:
                         angle = 0
                         scale = 1
                 else:
                     remaining = clip.duration - t
                     if remaining < duration:
-                        angle = 360 * (1 - remaining/duration)
-                        scale = remaining/duration
+                        angle = 360 * (1 - remaining / duration)
+                        scale = remaining / duration
                     else:
                         angle = 0
                         scale = 1
-
                 if scale > 0:
                     matrix = cv2.getRotationMatrix2D(center, angle, scale)
                     rotated = cv2.warpAffine(frame, matrix, (w, h))
                     return rotated
                 return np.zeros_like(frame)
-
             new_clip = mp.VideoClip(make_frame, duration=clip.duration)
             new_clip.fps = clip.fps
+            if clip.audio is not None:
+                new_clip = new_clip.set_audio(clip.audio)
             return new_clip
+
         elif internal_type == 'blur':
             def make_frame(t):
                 frame = clip.get_frame(t)
                 if internal_position == 'start':
                     if t < duration:
-                        sigma = 20 * (1 - t/duration)
-                        return cv2.GaussianBlur(frame, (0,0), sigma)
+                        sigma = 20 * (1 - t / duration)
+                        return cv2.GaussianBlur(frame, (0, 0), sigma)
                     return frame
                 else:
                     remaining = clip.duration - t
                     if remaining < duration:
-                        sigma = 20 * (1 - remaining/duration)
-                        return cv2.GaussianBlur(frame, (0,0), sigma)
+                        sigma = 20 * (1 - remaining / duration)
+                        return cv2.GaussianBlur(frame, (0, 0), sigma)
                     return frame
-
             new_clip = mp.VideoClip(make_frame, duration=clip.duration)
             new_clip.fps = clip.fps
+            if clip.audio is not None:
+                new_clip = new_clip.set_audio(clip.audio)
             return new_clip
 
+        # ---------------------------------------------------
+        # Novas transições
+        # ---------------------------------------------------
 
-        # Keep all other existing transition effects unchanged
+        elif internal_type == 'glitch':
+            def make_frame(t):
+                frame = clip.get_frame(t)
+                h, w = frame.shape[:2]
+                if internal_position == 'start':
+                    progress = min(1, t / duration) if t < duration else 1
+                else:
+                    progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
+                output = frame.copy()
+                stripe_height = 5  # altura da faixa em pixels
+                for y in range(0, h, stripe_height):
+                    offset = int(np.random.normal(0, 30 * (1 - progress)))
+                    y_end = min(y + stripe_height, h)
+                    output[y:y_end, :] = np.roll(frame[y:y_end, :], shift=offset, axis=1)
+                return output
+            return create_clip_with_audio(clip, make_frame)
+
+        elif internal_type == 'pixelate':
+            def make_frame(t):
+                frame = clip.get_frame(t)
+                h, w = frame.shape[:2]
+                if internal_position == 'start':
+                    progress = min(1, t / duration) if t < duration else 1
+                else:
+                    progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
+                # De 10% (muito pixelado) a 100% (normal)
+                scale = 0.1 + 0.9 * progress
+                new_w = max(1, int(w * scale))
+                new_h = max(1, int(h * scale))
+                small = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_NEAREST)
+                pixelated = cv2.resize(small, (w, h), interpolation=cv2.INTER_NEAREST)
+                return pixelated
+            return create_clip_with_audio(clip, make_frame)
+
+
+        elif internal_type == 'circle-wipe':
+            def make_frame(t):
+                frame = clip.get_frame(t)
+                h, w = frame.shape[:2]
+                center = (w // 2, h // 2)
+                max_radius = np.sqrt(center[0] ** 2 + center[1] ** 2)
+
+                if internal_position == 'start':
+                    progress = min(1, t / duration) if t < duration else 1
+                else:
+                    progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
+
+                radius = progress * max_radius
+                Y, X = np.ogrid[:h, :w]
+                dist_from_center = np.sqrt((X - center[0]) ** 2 + (Y - center[1]) ** 2)
+                mask = (dist_from_center <= radius).astype(np.float32)
+                mask = np.dstack([mask, mask, mask])
+                return (frame * mask).astype(np.uint8)
+            return create_clip_with_audio(clip, make_frame)
+
+
+        elif internal_type == 'swirl':
+            def make_frame(t):
+                frame = clip.get_frame(t)
+                h, w = frame.shape[:2]
+                center = (w / 2, h / 2)
+                if internal_position == 'start':
+                    progress = min(1, t / duration) if t < duration else 1
+                else:
+                    progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
+                max_angle = 2 * np.pi
+                angle_offset = max_angle * (1 - progress)
+                X, Y = np.meshgrid(np.arange(w), np.arange(h))
+                Xc = X - center[0]
+                Yc = Y - center[1]
+                theta = np.arctan2(Yc, Xc) + angle_offset * np.exp(-((Xc**2 + Yc**2) / (2*(max(w, h)/2)**2)))
+                radius = np.sqrt(Xc**2 + Yc**2)
+                map_x = (radius * np.cos(theta) + center[0]).astype(np.float32)
+                map_y = (radius * np.sin(theta) + center[1]).astype(np.float32)
+                swirled = cv2.remap(frame, map_x, map_y, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
+                return swirled
+            return create_clip_with_audio(clip, make_frame)
+
+        elif internal_type == 'wave':
+            def make_frame(t):
+                frame = clip.get_frame(t)
+                h, w = frame.shape[:2]
+                if internal_position == 'start':
+                    progress = min(1, t / duration) if t < duration else 1
+                else:
+                    progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
+                amplitude = 10 * (1 - progress)
+                frequency = 2
+                X, Y = np.meshgrid(np.arange(w), np.arange(h))
+                shift = amplitude * np.sin(2 * np.pi * Y / 30 * frequency)
+                map_x = (X + shift).astype(np.float32)
+                map_y = Y.astype(np.float32)
+                waved = cv2.remap(frame, map_x, map_y, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
+                return waved
+            return create_clip_with_audio(clip, make_frame)
+
+
+        elif internal_type == 'tile':
+            def make_frame(t):
+                frame = clip.get_frame(t)
+                h, w = frame.shape[:2]
+                tiles_x, tiles_y = 10, 10
+                tile_w = w // tiles_x
+                tile_h = h // tiles_y
+                np.random.seed(42)
+
+                if internal_position == 'start':
+                    progress = min(1, t / duration) if t < duration else 1
+                    output = np.zeros_like(frame)
+
+                    for i in range(tiles_y):
+                        for j in range(tiles_x):
+                            threshold = np.random.rand()
+
+                            if progress > threshold:
+                                x1 = j * tile_w
+                                y1 = i * tile_h
+                                x2 = x1 + tile_w if j < tiles_x - 1 else w
+                                y2 = y1 + tile_h if i < tiles_y - 1 else h
+                                output[y1:y2, x1:x2] = frame[y1:y2, x1:x2]
+
+                else:  # 'end'
+                    progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
+                    output = frame.copy()
+
+                    for i in range(tiles_y):
+                        for j in range(tiles_x):
+                            threshold = np.random.rand()
+
+                            # Aqui, quanto maior (1 - progress), mais blocos serão removidos
+                            if (1 - progress) > threshold:
+                                x1 = j * tile_w
+                                y1 = i * tile_h
+                                x2 = x1 + tile_w if j < tiles_x - 1 else w
+                                y2 = y1 + tile_h if i < tiles_y - 1 else h
+                                output[y1:y2, x1:x2] = 0
+
+                return output
+            return create_clip_with_audio(clip, make_frame)
+
+        elif internal_type == 'color-shift':
+            def make_frame(t):
+                frame = clip.get_frame(t)
+                h, w = frame.shape[:2]
+                if internal_position == 'start':
+                    progress = min(1, t / duration) if t < duration else 1
+                else:
+                    progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
+                max_offset = 20
+                offset = int(max_offset * (1 - progress))
+                b, g, r = cv2.split(frame)
+                M_right = np.float32([[1, 0, offset], [0, 1, 0]])
+                M_left = np.float32([[1, 0, -offset], [0, 1, 0]])
+                shifted_r = cv2.warpAffine(r, M_right, (w, h))
+                shifted_b = cv2.warpAffine(b, M_left, (w, h))
+                merged = cv2.merge([shifted_b, g, shifted_r])
+                return merged
+            return create_clip_with_audio(clip, make_frame)
+
+        elif internal_type == 'ripple':
+            def make_frame(t):
+                frame = clip.get_frame(t)
+                h, w = frame.shape[:2]
+                center = (w / 2, h / 2)
+                if internal_position == 'start':
+                    progress = min(1, t / duration) if t < duration else 1
+                else:
+                    progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
+                amplitude = 5 * (1 - progress)
+                wavelength = 20
+                X, Y = np.meshgrid(np.arange(w), np.arange(h))
+                distance = np.sqrt((X - center[0])**2 + (Y - center[1])**2)
+                displacement = amplitude * np.sin(2 * np.pi * distance / wavelength)
+                eps = 1e-5
+                dx = displacement * (X - center[0]) / (distance + eps)
+                dy = displacement * (Y - center[1]) / (distance + eps)
+                map_x = (X + dx).astype(np.float32)
+                map_y = (Y + dy).astype(np.float32)
+                rippled = cv2.remap(frame, map_x, map_y, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
+                return rippled
+            return create_clip_with_audio(clip, make_frame)
+
+        elif internal_type == 'spiral':
+            def make_frame(t):
+                frame = clip.get_frame(t)
+                h, w = frame.shape[:2]
+                center = (w / 2, h / 2)
+                if internal_position == 'start':
+                    progress = min(1, t / duration) if t < duration else 1
+                else:
+                    progress = max(0, (clip.duration - t) / duration) if t > clip.duration - duration else 1
+                max_angle = 2 * np.pi
+                angle_offset = max_angle * (1 - progress)
+                X, Y = np.meshgrid(np.arange(w), np.arange(h))
+                Xc = X - center[0]
+                Yc = Y - center[1]
+                radius = np.sqrt(Xc**2 + Yc**2)
+                theta = np.arctan2(Yc, Xc) + angle_offset
+                map_x = (radius * np.cos(theta) + center[0]).astype(np.float32)
+                map_y = (radius * np.sin(theta) + center[1]).astype(np.float32)
+                spiraled = cv2.remap(frame, map_x, map_y, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
+                return spiraled
+            return create_clip_with_audio(clip, make_frame)
+
+        # Caso nenhuma transição seja aplicada, retorna o clipe original
         return clip
+
     except Exception as e:
         logger.error(f"Failed to apply transition: {str(e)}")
         return clip
+
 
 def create_clip_with_audio(original_clip, make_frame_func):
     """Helper function to create a new clip while preserving audio"""
@@ -582,7 +902,7 @@ def process_video(timeline, output_path, target_resolution=None, background_audi
                 temp_files.append(temp_path)
 
                 duration = float(item.get('duration', 5))
-                keep_audio = item.get('keepAudio', True)
+                keep_audio = item.get('keepAudio', False)
 
                 try:
                     if item['filename'].lower().endswith(('.png', '.jpg', '.jpeg')):
@@ -617,6 +937,7 @@ def process_video(timeline, output_path, target_resolution=None, background_audi
                 try:
                     # Resize clip to target resolution with proper centering
                     clip = resize_clip_maintain_aspect(clip, target_width, target_height)
+                    clip.set_position(('center', 'center'))
 
                     # Apply filters
                     if item.get('filter'):

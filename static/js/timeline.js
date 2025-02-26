@@ -134,8 +134,7 @@ class Timeline {
                             <div class="col-md-6">
                                 <div class="form-group mb-3">
                                     <label>Start Transition</label>
-                                    <select class="form-control" 
-                                        onchange="window.timelineManager.updateTransition(${index}, this.value, 'start')">
+                                    <select class="form-control" onchange="window.timelineManager.updateTransition(${index}, this.value, 'start')">
                                         <option value="none">None</option>
                                         <option value="fade-in" ${item.startTransition === 'fade-in' ? 'selected' : ''}>Fade In</option>
                                         <option value="dissolve-in" ${item.startTransition === 'dissolve-in' ? 'selected' : ''}>Dissolve In</option>
@@ -144,19 +143,24 @@ class Timeline {
                                         <option value="rotate-in" ${item.startTransition === 'rotate-in' ? 'selected' : ''}>Rotate In</option>
                                         <option value="zoom-in" ${item.startTransition === 'zoom-in' ? 'selected' : ''}>Zoom In</option>
                                         <option value="blur-in" ${item.startTransition === 'blur-in' ? 'selected' : ''}>Blur In</option>
-                                        <option value="ripple-in" ${item.startTransition === 'ripple-in' ? 'selected' : ''}>Ripple In</option>
-                                        <option value="spiral-in" ${item.startTransition === 'spiral-in' ? 'selected' : ''}>Spiral In</option>
                                         <option value="matrix-in" ${item.startTransition === 'matrix-in' ? 'selected' : ''}>Digital Rain In</option>
                                         <option value="heart-in" ${item.startTransition === 'heart-in' ? 'selected' : ''}>Heart Wipe In</option>
                                         <option value="shatter-in" ${item.startTransition === 'shatter-in' ? 'selected' : ''}>Shatter In</option>
+                                        <option value="glitch-in" ${item.startTransition === 'glitch-in' ? 'selected' : ''}>Glitch In</option>
+                                        <option value="ripple-in" ${item.startTransition === 'ripple-in' ? 'selected' : ''}>Ripple In</option>
+                                        <option value="pixelate-in" ${item.startTransition === 'pixelate-in' ? 'selected' : ''}>Pixelate In</option>
+                                        <option value="circle-wipe-in" ${item.startTransition === 'circle-wipe-in' ? 'selected' : ''}>Circle Wipe In</option>
+                                        <option value="swirl-in" ${item.startTransition === 'swirl-in' ? 'selected' : ''}>Swirl In</option>
+                                        <option value="wave-in" ${item.startTransition === 'wave-in' ? 'selected' : ''}>Wave In</option>
+                                        <option value="tile-in" ${item.startTransition === 'tile-in' ? 'selected' : ''}>Tile In</option>
+                                        <option value="color-shift-in" ${item.startTransition === 'color-shift-in' ? 'selected' : ''}>Color Shift In</option>
                                     </select>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="form-group mb-3">
                                     <label>End Transition</label>
-                                    <select class="form-control" 
-                                        onchange="window.timelineManager.updateTransition(${index}, this.value, 'end')">
+                                    <select class="form-control" onchange="window.timelineManager.updateTransition(${index}, this.value, 'end')">
                                         <option value="none">None</option>
                                         <option value="fade-out" ${item.endTransition === 'fade-out' ? 'selected' : ''}>Fade Out</option>
                                         <option value="dissolve-out" ${item.endTransition === 'dissolve-out' ? 'selected' : ''}>Dissolve Out</option>
@@ -165,11 +169,17 @@ class Timeline {
                                         <option value="rotate-out" ${item.endTransition === 'rotate-out' ? 'selected' : ''}>Rotate Out</option>
                                         <option value="zoom-out" ${item.endTransition === 'zoom-out' ? 'selected' : ''}>Zoom Out</option>
                                         <option value="blur-out" ${item.endTransition === 'blur-out' ? 'selected' : ''}>Blur Out</option>
-                                        <option value="ripple-out" ${item.endTransition === 'ripple-out' ? 'selected' : ''}>Ripple Out</option>
-                                        <option value="spiral-out" ${item.endTransition === 'spiral-out' ? 'selected' : ''}>Spiral Out</option>
                                         <option value="matrix-out" ${item.endTransition === 'matrix-out' ? 'selected' : ''}>Digital Rain Out</option>
                                         <option value="heart-out" ${item.endTransition === 'heart-out' ? 'selected' : ''}>Heart Wipe Out</option>
                                         <option value="shatter-out" ${item.endTransition === 'shatter-out' ? 'selected' : ''}>Shatter Out</option>
+                                        <option value="glitch-out" ${item.endTransition === 'glitch-out' ? 'selected' : ''}>Glitch Out</option>
+                                        <option value="ripple-out" ${item.endTransition === 'ripple-out' ? 'selected' : ''}>Ripple Out</option>
+                                        <option value="pixelate-out" ${item.endTransition === 'pixelate-out' ? 'selected' : ''}>Pixelate Out</option>
+                                        <option value="circle-wipe-out" ${item.endTransition === 'circle-wipe-out' ? 'selected' : ''}>Circle Wipe Out</option>
+                                        <option value="swirl-out" ${item.endTransition === 'swirl-out' ? 'selected' : ''}>Swirl Out</option>
+                                        <option value="wave-out" ${item.endTransition === 'wave-out' ? 'selected' : ''}>Wave Out</option>
+                                        <option value="tile-out" ${item.endTransition === 'tile-out' ? 'selected' : ''}>Tile Out</option>
+                                        <option value="color-shift-out" ${item.endTransition === 'color-shift-out' ? 'selected' : ''}>Color Shift Out</option>
                                     </select>
                                 </div>
                             </div>
@@ -193,6 +203,17 @@ class Timeline {
                                 <option value="neon" ${item.filter === 'neon' ? 'selected' : ''}>Neon Glow</option>
                                 <option value="thermal" ${item.filter === 'thermal' ? 'selected' : ''}>Thermal Vision</option>
                                 <option value="pencil_sketch" ${item.filter === 'pencil_sketch' ? 'selected' : ''}>Pencil Sketch</option>
+                                <option value="invert" ${item.filter === 'invert' ? 'selected' : ''}>Invert</option>
+                                <option value="emboss" ${item.filter === 'emboss' ? 'selected' : ''}>Emboss</option>
+                                <option value="glitch" ${item.filter === 'glitch' ? 'selected' : ''}>Glitch</option>
+                                <option value="pixelate" ${item.filter === 'pixelate' ? 'selected' : ''}>Pixelate</option>
+                                <option value="edge_detect" ${item.filter === 'edge_detect' ? 'selected' : ''}>Edge Detect</option>
+                                <option value="posterize" ${item.filter === 'posterize' ? 'selected' : ''}>Posterize</option>
+                                <option value="solarize" ${item.filter === 'solarize' ? 'selected' : ''}>Solarize</option>
+                                <option value="vignette" ${item.filter === 'vignette' ? 'selected' : ''}>Vignette</option>
+                                <option value="halftone" ${item.filter === 'halftone' ? 'selected' : ''}>Halftone</option>
+                                <option value="noise" ${item.filter === 'noise' ? 'selected' : ''}>Noise</option>
+                                <option value="color_shift" ${item.filter === 'color_shift' ? 'selected' : ''}>Color Shift</option>
                             </select>
                         </div>
                         <div class="form-check mb-3">
@@ -213,7 +234,7 @@ class Timeline {
 
     updateDuration(index, value) {
         const duration = parseFloat(value);
-        if (duration > 0 && duration <= 300) {
+        if (duration > 0 && duration <= 72000) {
             this.items[index].duration = duration;
             this.updateUI();
         }
@@ -256,6 +277,7 @@ class Timeline {
         document.getElementById('timeline').appendChild(durationDisplay);
     }
 }
+
 
 // Initialize timeline functionality
 const timelineManager = new Timeline();

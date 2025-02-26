@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function validateFile(file) {
         if (file.size > MAX_FILE_SIZE) {
-            throw new Error(`File ${file.name} is too large. Maximum size is 16MB`);
+            throw new Error(`File ${file.name} is too large. Maximum size is 64MB`);
         }
         const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'video/mp4'];
         if (!allowedTypes.includes(file.type)) {
@@ -182,14 +182,21 @@ document.addEventListener('DOMContentLoaded', function() {
                                         <option value="dissolve-in" ${item.startTransition === 'dissolve-in' ? 'selected' : ''}>Dissolve In</option>
                                         <option value="slide-right" ${item.startTransition === 'slide-right' ? 'selected' : ''}>Slide Right</option>
                                         <option value="zoom-in" ${item.startTransition === 'zoom-in' ? 'selected' : ''}>Zoom In</option>
-                                        <option value="ripple-in" ${item.startTransition === 'ripple-in' ? 'selected' : ''}>Ripple In</option>
-                                        <option value="spiral-in" ${item.startTransition === 'spiral-in' ? 'selected' : ''}>Spiral In</option>
                                         <option value="matrix-in" ${item.startTransition === 'matrix-in' ? 'selected' : ''}>Matrix In</option>
                                         <option value="heart-in" ${item.startTransition === 'heart-in' ? 'selected' : ''}>Heart In</option>
                                         <option value="shatter-in" ${item.startTransition === 'shatter-in' ? 'selected' : ''}>Shatter In</option>
                                         <option value="rotate-in" ${item.startTransition === 'rotate-in' ? 'selected' : ''}>Rotate In</option>
                                         <option value="blur-in" ${item.startTransition === 'blur-in' ? 'selected' : ''}>Blur In</option>
                                         <option value="wipe-right" ${item.startTransition === 'wipe-right' ? 'selected' : ''}>Wipe Right</option>
+                                        <option value="glitch-in" ${item.startTransition === 'glitch-in' ? 'selected' : ''}>Glitch In</option>
+                                        <option value="ripple-in" ${item.startTransition === 'ripple-in' ? 'selected' : ''}>Ripple In</option>
+                                        <option value="pixelate-in" ${item.startTransition === 'pixelate-in' ? 'selected' : ''}>Pixelate In</option>
+                                        <option value="circle-wipe-in" ${item.startTransition === 'circle-wipe-in' ? 'selected' : ''}>CircleWipe In</option>
+                                        <option value="swirl-in" ${item.startTransition === 'swirl-in' ? 'selected' : ''}>Swirl In</option>
+                                        <option value="wave-in" ${item.startTransition === 'wave-in' ? 'selected' : ''}>Wave In</option>
+                                        <option value="tile-in" ${item.startTransition === 'tile-in' ? 'selected' : ''}>Tile In</option>
+                                        <option value="color-shift-in" ${item.startTransition === 'color-shift-in' ? 'selected' : ''}>ColorShift In</option>
+                                        <option value="spiral-in" ${item.startTransition === 'spiral-in' ? 'selected' : ''}>Spiral In</option>
                                     </select>
                                 </div>
                             </div>
@@ -202,14 +209,21 @@ document.addEventListener('DOMContentLoaded', function() {
                                         <option value="dissolve-out" ${item.endTransition === 'dissolve-out' ? 'selected' : ''}>Dissolve Out</option>
                                         <option value="slide-left" ${item.endTransition === 'slide-left' ? 'selected' : ''}>Slide Left</option>
                                         <option value="zoom-out" ${item.endTransition === 'zoom-out' ? 'selected' : ''}>Zoom Out</option>
-                                        <option value="ripple-out" ${item.endTransition === 'ripple-out' ? 'selected' : ''}>Ripple Out</option>
-                                        <option value="spiral-out" ${item.endTransition === 'spiral-out' ? 'selected' : ''}>Spiral Out</option>
                                         <option value="matrix-out" ${item.endTransition === 'matrix-out' ? 'selected' : ''}>Matrix Out</option>
                                         <option value="heart-out" ${item.endTransition === 'heart-out' ? 'selected' : ''}>Heart Out</option>
                                         <option value="shatter-out" ${item.endTransition === 'shatter-out' ? 'selected' : ''}>Shatter Out</option>
                                         <option value="rotate-out" ${item.endTransition === 'rotate-out' ? 'selected' : ''}>Rotate Out</option>
                                         <option value="blur-out" ${item.endTransition === 'blur-out' ? 'selected' : ''}>Blur Out</option>
                                         <option value="wipe-left" ${item.endTransition === 'wipe-left' ? 'selected' : ''}>Wipe Left</option>
+                                        <option value="glitch-out" ${item.endTransition === 'glitch-out' ? 'selected' : ''}>Glitch Out</option>
+                                        <option value="ripple-out" ${item.endTransition === 'ripple-out' ? 'selected' : ''}>Ripple Out</option>
+                                        <option value="pixelate-out" ${item.endTransition === 'pixelate-out' ? 'selected' : ''}>Pixelate Out</option>
+                                        <option value="circle-wipe-out" ${item.endTransition === 'circle-wipe-out' ? 'selected' : ''}>CircleWipe Out</option>
+                                        <option value="swirl-out" ${item.endTransition === 'swirl-out' ? 'selected' : ''}>Swirl Out</option>
+                                        <option value="wave-out" ${item.endTransition === 'wave-out' ? 'selected' : ''}>Wave Out</option>
+                                        <option value="tile-out" ${item.endTransition === 'tile-out' ? 'selected' : ''}>Tile Out</option>
+                                        <option value="color-shift-out" ${item.endTransition === 'color-shift-out' ? 'selected' : ''}>ColorShift Out</option>
+                                        <option value="spiral-out" ${item.endTransition === 'spiral-out' ? 'selected' : ''}>Spiral Out</option>
                                     </select>
                                 </div>
                             </div>
@@ -232,6 +246,17 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <option value="neon" ${item.filter === 'neon' ? 'selected' : ''}>Neon</option>
                                 <option value="thermal" ${item.filter === 'thermal' ? 'selected' : ''}>Thermal</option>
                                 <option value="pencil_sketch" ${item.filter === 'pencil_sketch' ? 'selected' : ''}>Pencil Sketch</option>
+                                <option value="invert" ${item.filter === 'invert' ? 'selected' : ''}>Invert</option>
+                                <option value="emboss" ${item.filter === 'emboss' ? 'selected' : ''}>Emboss</option>
+                                <option value="glitch" ${item.filter === 'glitch' ? 'selected' : ''}>Glitch</option>
+                                <option value="pixelate" ${item.filter === 'pixelate' ? 'selected' : ''}>Pixelate</option>
+                                <option value="edge_detect" ${item.filter === 'edge_detect' ? 'selected' : ''}>Edge Detect</option>
+                                <option value="posterize" ${item.filter === 'posterize' ? 'selected' : ''}>Posterize</option>
+                                <option value="solarize" ${item.filter === 'solarize' ? 'selected' : ''}>Solarize</option>
+                                <option value="vignette" ${item.filter === 'vignette' ? 'selected' : ''}>Vignette</option>
+                                <option value="halftone" ${item.filter === 'halftone' ? 'selected' : ''}>Halftone</option>
+                                <option value="noise" ${item.filter === 'noise' ? 'selected' : ''}>Noise</option>
+                                <option value="color_shift" ${item.filter === 'color_shift' ? 'selected' : ''}>Color Shift</option>
                             </select>
                         </div>
                         ${isVideo ? `
